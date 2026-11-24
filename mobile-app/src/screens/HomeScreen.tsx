@@ -326,7 +326,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 <View style={[styles.shieldIconWrap, { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.18)' : '#ECFDF5' }]}>
                   <Ionicons name="shield-checkmark" size={13} color="#10B981" />
                 </View>
-                <Text style={[styles.heroColumnLabel, { color: isDark ? '#94A3B8' : '#64748B' }]} numberOfLines={1}>
+                <Text
+                  style={[styles.heroColumnLabel, { color: isDark ? '#94A3B8' : '#64748B' }]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.8}
+                >
                   {language === 'bn' ? 'নিরাপদ দৈনিক খরচ' : 'Safe Daily Spending Limit'}
                 </Text>
               </View>
@@ -334,7 +339,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               <View style={styles.heroAmountRow}>
                 <Text style={[styles.heroCurrencySymbol, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>৳</Text>
                 <Text style={[styles.heroAmountNum, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-                  {dashboard.daily_safe_to_spend}
+                  {Math.round(dashboard.daily_safe_to_spend || 0)}
                 </Text>
                 <Text style={[styles.heroPerDay, { color: theme.textSecondary }]}>
                   / {language === 'bn' ? 'দিন' : 'day'}
@@ -635,29 +640,61 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </View>
 
           <View style={styles.streakDaysRow}>
-            {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, idx) => {
-              const activeStreak = dashboard.on_track_streak || 1;
-              const isChecked = idx < activeStreak;
-              return (
-                <View key={idx} style={styles.streakDayNode}>
-                  <View
-                    style={[
-                      styles.streakDayDot,
-                      {
-                        backgroundColor: isChecked
-                          ? '#10B981'
-                          : (isDark ? 'rgba(255, 255, 255, 0.12)' : '#E2E8F0'),
-                      },
-                    ]}
-                  >
-                    {isChecked && <Ionicons name="checkmark" size={10} color="#FFFFFF" />}
+            {(() => {
+              const today = new Date();
+              const currentDayOfWeek = today.getDay(); // 0 = Sun, 1 = Mon, 2 = Tue, 3 = Wed, 4 = Thu, 5 = Fri, 6 = Sat
+              const activeStreak = Math.max(1, dashboard.on_track_streak || 1);
+              const days = [
+                { label: 'S', dayIndex: 0 },
+                { label: 'M', dayIndex: 1 },
+                { label: 'T', dayIndex: 2 },
+                { label: 'W', dayIndex: 3 },
+                { label: 'T', dayIndex: 4 },
+                { label: 'F', dayIndex: 5 },
+                { label: 'S', dayIndex: 6 },
+              ];
+
+              return days.map((d, idx) => {
+                const isPastOrToday = idx <= currentDayOfWeek;
+                const isToday = idx === currentDayOfWeek;
+                // A day is checked if it falls within the active streak leading up to today
+                const isChecked = isPastOrToday && (currentDayOfWeek - idx < activeStreak);
+
+                return (
+                  <View key={idx} style={styles.streakDayNode}>
+                    <View
+                      style={[
+                        styles.streakDayDot,
+                        {
+                          backgroundColor: isChecked
+                            ? '#10B981'
+                            : (isDark ? 'rgba(255, 255, 255, 0.12)' : '#E2E8F0'),
+                          borderColor: isToday
+                            ? (isChecked ? '#059669' : '#10B981')
+                            : 'transparent',
+                          borderWidth: isToday ? 1.5 : 0,
+                        },
+                      ]}
+                    >
+                      {isChecked && <Ionicons name="checkmark" size={10} color="#FFFFFF" />}
+                    </View>
+                    <Text
+                      style={[
+                        styles.streakDayLabel,
+                        {
+                          color: isToday
+                            ? '#059669'
+                            : (isDark ? '#94A3B8' : '#64748B'),
+                          fontWeight: isToday ? '700' : '500',
+                        },
+                      ]}
+                    >
+                      {d.label}
+                    </Text>
                   </View>
-                  <Text style={[styles.streakDayLabel, { color: isDark ? '#94A3B8' : '#64748B' }]}>
-                    {day}
-                  </Text>
-                </View>
-              );
-            })}
+                );
+              });
+            })()}
           </View>
         </View>
 

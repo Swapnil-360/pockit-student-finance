@@ -14,7 +14,7 @@ import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../constants/ThemeContext';
 import { TRANSLATIONS, Language } from '../constants/translations';
-import { fetchSavingsGoals, toggleGoalPause, deleteSavingsGoal, SavingsGoal } from '../services/api';
+import { fetchSavingsGoals, toggleGoalPause, boostSavingsGoal, deleteSavingsGoal, SavingsGoal } from '../services/api';
 import { SavingsGoalCard } from '../components/SavingsGoalCard';
 import { CreateGoalModal } from '../components/CreateGoalModal';
 import { BoostGoalModal } from '../components/BoostGoalModal';
@@ -96,6 +96,36 @@ export const GoalsScreen: React.FC<GoalsScreenProps> = ({
     setSweepModalVisible(true);
   };
 
+  const handleSaveMonth = async (goal: SavingsGoal, amount: number) => {
+    Alert.alert(
+      language === 'bn' ? 'মাসিক সঞ্চয় নিশ্চিতকরণ' : 'Save for this Month?',
+      language === 'bn'
+        ? `"${goal.title}" লক্ষ্যের জন্য চলতি মাসের ৳${amount.toLocaleString()} জমা করতে চান? এটি সাথে সাথে আপনার প্রগ্রেস বারে যুক্ত হবে।`
+        : `Save ৳${amount.toLocaleString()} for "${goal.title}" this month? This will be added to your goal progress bar.`,
+      [
+        { text: language === 'bn' ? 'বাতিল' : 'Cancel', style: 'cancel' },
+        {
+          text: language === 'bn' ? 'জমা দিন' : 'Save Now',
+          onPress: async () => {
+            try {
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              const updated = await boostSavingsGoal(goal.id, userId, amount);
+              handleGoalUpdated(updated);
+              Alert.alert(
+                language === 'bn' ? 'সফল!' : 'Saved for Target! 🎉',
+                language === 'bn'
+                  ? `৳${amount.toLocaleString()} সফলভাবে জমা হয়েছে এবং প্রগ্রেস বার আপডেট হয়েছে!`
+                  : `৳${amount.toLocaleString()} has been added to your goal! Your progress bar is updated.`
+              );
+            } catch (err: any) {
+              Alert.alert('Error', err.message || 'Failed to save for month');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleDeleteGoal = (goal: SavingsGoal) => {
     Alert.alert(
       language === 'bn' ? 'লক্ষ্য মুছে ফেলবেন?' : 'Delete Savings Goal?',
@@ -137,9 +167,6 @@ export const GoalsScreen: React.FC<GoalsScreenProps> = ({
     setSelectedGoal(updated);
     if (onRefreshParent) onRefreshParent();
   };
-
-  const totalSavedAllGoals = goals.reduce((acc, g) => acc + (g.current_saved || 0), 0);
-  const totalTargetAllGoals = goals.reduce((acc, g) => acc + (g.target_amount || 0), 0);
 
   return (
     <View style={[styles.container, { backgroundColor: isDark ? '#0D1624' : '#EEF3F7' }]}>
@@ -184,66 +211,6 @@ export const GoalsScreen: React.FC<GoalsScreenProps> = ({
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.primaryAccent} />
         }
       >
-        {/* Total Vault Stats Card */}
-        <View
-          style={[
-            styles.statsCard,
-            {
-              backgroundColor: isDark ? 'rgba(23, 37, 56, 0.7)' : '#FFFFFF',
-              borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(83, 122, 150, 0.12)',
-              shadowColor: isDark ? '#000000' : '#466B85',
-            },
-          ]}
-        >
-          <View style={styles.statsRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
-                {language === 'bn' ? 'মোট সংরক্ষিত সঞ্চয়' : 'Total Vault Savings'}
-              </Text>
-              <Text style={[styles.statValue, { color: theme.textPrimary }]}>
-                ৳{Math.round(totalSavedAllGoals).toLocaleString()}
-              </Text>
-            </View>
-
-            <View style={[styles.vaultIconCircle, { backgroundColor: isDark ? 'rgba(224, 122, 95, 0.15)' : '#FDF0EC' }]}>
-              <Ionicons name="shield-checkmark" size={28} color={theme.primaryAccent} />
-            </View>
-          </View>
-
-          <View style={[styles.statDivider, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : '#EAF2F8' }]} />
-
-          <View style={styles.subStatsRow}>
-            <View style={styles.subStatItem}>
-              <Text style={[styles.subStatLabel, { color: theme.textSecondary }]}>
-                {language === 'bn' ? 'চলমান লক্ষ্য' : 'Active Goals'}
-              </Text>
-              <Text style={[styles.subStatValue, { color: theme.slateBlue }]}>
-                {goals.length}
-              </Text>
-            </View>
-
-            <View style={styles.subStatItem}>
-              <Text style={[styles.subStatLabel, { color: theme.textSecondary }]}>
-                {language === 'bn' ? 'সুরক্ষিত মাসিক চুক্তি' : 'Monthly Protected'}
-              </Text>
-              <Text style={[styles.subStatValue, { color: theme.primaryAccent }]}>
-                ৳{Math.round(activeGoal?.monthly_commitment || 0)}
-              </Text>
-            </View>
-
-            <View style={styles.subStatItem}>
-              <Text style={[styles.subStatLabel, { color: theme.textSecondary }]}>
-                {language === 'bn' ? 'সমাপ্তির অনুপাত' : 'Overall Pace'}
-              </Text>
-              <Text style={[styles.subStatValue, { color: '#10B981' }]}>
-                {totalTargetAllGoals > 0
-                  ? `${Math.round((totalSavedAllGoals / totalTargetAllGoals) * 100)}%`
-                  : '0%'}
-              </Text>
-            </View>
-          </View>
-        </View>
-
         {/* Section Title */}
         <Text style={[styles.sectionHeading, { color: theme.textPrimary }]}>
           {language === 'bn' ? 'আপনার মূল লক্ষ্য' : 'Your Primary Goal'}
@@ -255,6 +222,7 @@ export const GoalsScreen: React.FC<GoalsScreenProps> = ({
           language={language}
           onOpenBoost={handleOpenBoost}
           onTogglePause={handleTogglePause}
+          onSaveMonth={handleSaveMonth}
           onCreateGoal={() => setCreateModalVisible(true)}
           onOpenSweep={handleOpenSweep}
           onDeleteGoal={handleDeleteGoal}
@@ -318,11 +286,11 @@ export const GoalsScreen: React.FC<GoalsScreenProps> = ({
                       {gPct.toFixed(0)}%
                     </Text>
                     <TouchableOpacity
-                      onPress={() => handleOpenBoost(g)}
+                      onPress={() => handleSaveMonth(g, Math.round(g.monthly_commitment || 500))}
                       style={[styles.miniBoostBtn, { backgroundColor: isDark ? 'rgba(224, 122, 95, 0.18)' : '#FDF0EC' }]}
                       hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                     >
-                      <Ionicons name="flash-outline" size={13} color={theme.primaryAccent} />
+                      <Ionicons name="wallet-outline" size={13} color={theme.primaryAccent} />
                     </TouchableOpacity>
                     <TouchableOpacity
                       onPress={() => handleDeleteGoal(g)}
@@ -335,55 +303,6 @@ export const GoalsScreen: React.FC<GoalsScreenProps> = ({
                 </View>
               );
             })}
-          </View>
-        )}
-
-        {/* Milestone Walkthrough */}
-        {activeGoal && (
-          <View
-            style={[
-              styles.milestoneCard,
-              {
-                backgroundColor: isDark ? 'rgba(23, 37, 56, 0.7)' : '#FFFFFF',
-                borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(83, 122, 150, 0.12)',
-                shadowColor: isDark ? '#000000' : '#466B85',
-              },
-            ]}
-          >
-            <Text style={[styles.milestoneTitle, { color: theme.textPrimary }]}>
-              {language === 'bn' ? 'অগ্রগতির ধাপসমূহ' : 'Goal Milestones'}
-            </Text>
-
-            <View style={styles.milestoneSteps}>
-              {[25, 50, 75, 100].map((pct) => {
-                const reached = (activeGoal.progress_pct || 0) >= pct;
-                return (
-                  <View key={pct} style={styles.stepItem}>
-                    <View
-                      style={[
-                        styles.stepDot,
-                        {
-                          backgroundColor: reached
-                            ? '#10B981'
-                            : isDark ? 'rgba(255, 255, 255, 0.15)' : '#D5E4EF',
-                        },
-                      ]}
-                    >
-                      {reached ? (
-                        <Ionicons name="checkmark" size={12} color="#FFFFFF" />
-                      ) : (
-                        <Text style={[styles.stepDotText, { color: theme.textSecondary }]}>
-                          {pct}
-                        </Text>
-                      )}
-                    </View>
-                    <Text style={[styles.stepLabel, { color: reached ? theme.textPrimary : theme.textSecondary }]}>
-                      {pct}%
-                    </Text>
-                  </View>
-                );
-              })}
-            </View>
           </View>
         )}
 
@@ -461,104 +380,11 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingHorizontal: 16,
   },
-  statsCard: {
-    borderRadius: 22,
-    borderWidth: 1,
-    padding: 20,
-    marginBottom: 18,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 3,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  statLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-    marginBottom: 4,
-  },
-  statValue: {
-    fontSize: 28,
-    fontWeight: '800',
-    letterSpacing: -0.5,
-  },
-  vaultIconCircle: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  statDivider: {
-    height: 1,
-    marginVertical: 14,
-  },
-  subStatsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  subStatItem: {
-    alignItems: 'flex-start',
-  },
-  subStatLabel: {
-    fontSize: 11,
-    fontWeight: '500',
-    marginBottom: 3,
-  },
-  subStatValue: {
-    fontSize: 15,
-    fontWeight: '700',
-  },
   sectionHeading: {
     fontSize: 15,
     fontWeight: '700',
     paddingHorizontal: 4,
     marginBottom: 12,
-  },
-  milestoneCard: {
-    borderRadius: 22,
-    borderWidth: 1,
-    padding: 18,
-    marginBottom: 16,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    elevation: 2,
-  },
-  milestoneTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    marginBottom: 14,
-  },
-  milestoneSteps: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 8,
-  },
-  stepItem: {
-    alignItems: 'center',
-  },
-  stepDot: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 4,
-  },
-  stepDotText: {
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  stepLabel: {
-    fontSize: 11,
-    fontWeight: '600',
   },
   tipCard: {
     flexDirection: 'row',

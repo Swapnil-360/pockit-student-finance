@@ -11,6 +11,7 @@ interface SavingsGoalCardProps {
   language: Language;
   onOpenBoost: (goal: SavingsGoal) => void;
   onTogglePause: (goal: SavingsGoal) => void;
+  onSaveMonth?: (goal: SavingsGoal, amount: number) => void;
   onCreateGoal: () => void;
   onOpenSweep?: (goal: SavingsGoal) => void;
   onDeleteGoal?: (goal: SavingsGoal) => void;
@@ -23,6 +24,7 @@ export const SavingsGoalCard: React.FC<SavingsGoalCardProps> = ({
   language,
   onOpenBoost,
   onTogglePause,
+  onSaveMonth,
   onCreateGoal,
   onOpenSweep,
   onDeleteGoal,
@@ -286,19 +288,26 @@ export const SavingsGoalCard: React.FC<SavingsGoalCardProps> = ({
         </TouchableOpacity>
       )}
 
-      {/* Action Buttons Row */}
+      {/* Action Buttons: Save for Target & Pause this Month */}
       <View style={styles.actionsRow}>
         <TouchableOpacity
-          style={[styles.actionBtn, styles.boostBtn, { backgroundColor: theme.primaryAccent }]}
+          style={[styles.actionBtn, styles.saveTargetBtn, { backgroundColor: theme.primaryAccent }]}
           onPress={() => {
             try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); } catch {}
-            onOpenBoost(goal);
+            const monthlyTarget = Math.round(isTimelineMode ? (requiredMonthly || 500) : (goal.monthly_commitment || 500));
+            if (onSaveMonth) {
+              onSaveMonth(goal, monthlyTarget);
+            } else {
+              onOpenBoost(goal);
+            }
           }}
           activeOpacity={0.85}
         >
-          <Ionicons name="trending-up-outline" size={16} color="#FFFFFF" style={{ marginRight: 4 }} />
-          <Text style={styles.boostBtnText}>
-            {language === 'bn' ? 'বুস্ট' : 'Boost'}
+          <Ionicons name="wallet-outline" size={16} color="#FFFFFF" style={{ marginRight: 5 }} />
+          <Text style={styles.saveTargetBtnText} numberOfLines={1}>
+            {language === 'bn'
+              ? `টার্গেটে জমা (৳${Math.round(isTimelineMode ? (requiredMonthly || 500) : (goal.monthly_commitment || 500)).toLocaleString()})`
+              : `Save for Target (৳${Math.round(isTimelineMode ? (requiredMonthly || 500) : (goal.monthly_commitment || 500)).toLocaleString()})`}
           </Text>
         </TouchableOpacity>
 
@@ -328,13 +337,26 @@ export const SavingsGoalCard: React.FC<SavingsGoalCardProps> = ({
               styles.pauseBtnText,
               { color: goal.is_paused ? theme.primaryAccent : theme.textSecondary },
             ]}
+            numberOfLines={1}
           >
             {goal.is_paused
               ? language === 'bn' ? 'চালু করুন' : 'Resume'
-              : language === 'bn' ? 'বিরতি' : 'Pause Month'}
+              : language === 'bn' ? 'এই মাস বিরতি' : 'Pause this Month'}
           </Text>
         </TouchableOpacity>
       </View>
+
+      {/* Secondary Custom Boost Link */}
+      <TouchableOpacity
+        onPress={() => onOpenBoost(goal)}
+        activeOpacity={0.7}
+        style={styles.customBoostLink}
+      >
+        <Ionicons name="flash-outline" size={12} color={theme.primaryAccent} style={{ marginRight: 4 }} />
+        <Text style={[styles.customBoostText, { color: theme.primaryAccent }]}>
+          {language === 'bn' ? '+ অতিরিক্ত বা অন্য পরিমাণ জমা' : '+ Custom Boost / Other Amount'}
+        </Text>
+      </TouchableOpacity>
     </View>
   );
 };
@@ -527,24 +549,47 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   actionBtn: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 9,
+    paddingVertical: 10,
     borderRadius: 12,
   },
-  boostBtn: {},
+  saveTargetBtn: {
+    flex: 1.25,
+    paddingHorizontal: 8,
+  },
+  saveTargetBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12.5,
+    fontWeight: '700',
+  },
+  boostBtn: {
+    flex: 1,
+  },
   boostBtnText: {
     color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '600',
   },
   pauseBtn: {
+    flex: 0.95,
     borderWidth: 1,
+    paddingHorizontal: 6,
   },
   pauseBtnText: {
-    fontSize: 13,
+    fontSize: 12.5,
+    fontWeight: '600',
+  },
+  customBoostLink: {
+    alignSelf: 'center',
+    marginTop: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  customBoostText: {
+    fontSize: 11.5,
     fontWeight: '600',
   },
   deleteGoalBtn: {
