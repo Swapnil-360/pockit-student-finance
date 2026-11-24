@@ -265,25 +265,25 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </View>
 
           <View style={styles.headerRightActions}>
+            {/* Proper App Guide & Feature Info (ℹ️) Button (Clear guide for new & returning users) */}
             <TouchableOpacity
               style={[
-                styles.notifBtn,
+                styles.infoGuideBtn,
                 {
-                  backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : '#FFFFFF',
-                  borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(83, 122, 150, 0.15)',
-                  shadowColor: isDark ? '#000000' : '#466B85',
+                  backgroundColor: isDark ? 'rgba(234, 88, 12, 0.15)' : '#FFF7ED',
+                  borderColor: isDark ? 'rgba(234, 88, 12, 0.35)' : '#FFEDD5',
+                  shadowColor: isDark ? '#000000' : '#EA580C',
                 },
               ]}
               onPress={() => {
                 try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
                 setWalkthroughVisible(true);
               }}
-              activeOpacity={0.8}
+              activeOpacity={0.75}
               accessibilityRole="button"
-              accessibilityLabel="Notifications and Feature Guide"
+              accessibilityLabel="App Features and User Guide"
             >
-              <Ionicons name="notifications-outline" size={20} color={isDark ? '#F8FAFC' : '#1E293B'} />
-              <View style={styles.notifRedDot} />
+              <Ionicons name="information" size={20} color="#EA580C" />
             </TouchableOpacity>
 
             <UserAvatar
@@ -792,27 +792,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
   },
-  notifBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  infoGuideBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    position: 'relative',
+    borderWidth: 1.5,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
     elevation: 2,
-  },
-  notifRedDot: {
-    position: 'absolute',
-    top: 9,
-    right: 10,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#EF4444',
   },
   greetingSection: {
     marginBottom: 16,
@@ -1180,14 +1170,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-  },
-  infoGuideBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
   },
   streakPill: {
     flexDirection: 'row',

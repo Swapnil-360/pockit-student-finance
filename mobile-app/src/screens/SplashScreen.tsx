@@ -175,18 +175,18 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ language, onFinish }
           },
         ]}
       >
-        {/* Crisp Circular White Badge with Centered Zoomed-In Shield Logo */}
+        {/* Animated Loading Mascot Illustration */}
         <Animated.View
           style={[
-            styles.logoCircle,
+            styles.mascotContainer,
             {
               transform: [{ scale: pulseAnim }],
             },
           ]}
         >
           <Image
-            source={BRANDING.assets.logo}
-            style={styles.logoImage}
+            source={BRANDING.assets.splashMascot || require('../../assets/logo/file_0000000001588211a3990faca79abdd6.png')}
+            style={styles.mascotImage}
             resizeMode="contain"
           />
         </Animated.View>
@@ -272,24 +272,18 @@ const styles = StyleSheet.create({
   contentBox: {
     alignItems: 'center',
     width: '100%',
-    marginTop: -40,
+    marginTop: -30,
   },
-  logoCircle: {
-    width: 148,
-    height: 148,
-    borderRadius: 74,
-    backgroundColor: '#FFFFFF',
+  mascotContainer: {
+    width: 250,
+    height: 168,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.32,
-    shadowRadius: 18,
-    elevation: 12,
+    marginBottom: 4,
   },
-  logoImage: {
-    width: 114,
-    height: 114,
+  mascotImage: {
+    width: '100%',
+    height: '100%',
   },
   appTitle: {
     fontSize: 32,
@@ -298,7 +292,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 0.4,
     textAlign: 'center',
-    marginTop: 26,
+    marginTop: 12,
   },
   taglineEn: {
     fontSize: 15,
