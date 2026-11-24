@@ -6,7 +6,6 @@ if (Platform.OS !== 'web') {
   try {
     Notifications.setNotificationHandler({
       handleNotification: async () => ({
-        shouldShowAlert: true,
         shouldPlaySound: true,
         shouldSetBadge: false,
         shouldShowBanner: true,
@@ -14,7 +13,7 @@ if (Platform.OS !== 'web') {
       }),
     });
   } catch (err) {
-    console.warn('Failed to set notification handler:', err);
+    // Graceful handler setup
   }
 }
 
@@ -53,11 +52,16 @@ export async function scheduleDailySpendingReminder(
         : 'Did you track today’s expenses? Log your spending now to keep your Risk Score accurate.';
 
     if (Platform.OS === 'android') {
-      await Notifications.setNotificationChannelAsync('daily-reminders', {
-        name: 'Daily Reminders',
-        importance: Notifications.AndroidImportance.HIGH,
-        sound: 'default',
-      });
+      try {
+        await Notifications.setNotificationChannelAsync('daily-reminders', {
+          name: 'Daily Reminders',
+          importance: Notifications.AndroidImportance.HIGH,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#EA580C',
+        });
+      } catch (channelErr) {
+        // Channel setup fallback on dev client
+      }
     }
 
     const trigger: any = {
@@ -71,13 +75,12 @@ export async function scheduleDailySpendingReminder(
       content: {
         title,
         body,
-        sound: true,
       },
       trigger,
     });
     return id;
   } catch (error) {
-    console.warn('Failed to schedule daily notification:', error);
+    // Suppress noisy dev-client warning when permission or channel manager is not yet ready
     return null;
   }
 }

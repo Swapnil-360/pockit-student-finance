@@ -609,7 +609,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           )}
         </View>
 
-        {/* 6. Weekly Streak Card (Image 1 Style) */}
+        {/* 6. Weekly Streak Card (Image 1 Style - Responsive & Overflow Protected) */}
         <View
           style={[
             styles.weeklyStreakCard,
@@ -621,16 +621,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         >
           <View style={styles.streakLeftWrap}>
             <View style={styles.flameIconWrap}>
-              <Ionicons name="flame" size={26} color="#EA580C" />
+              <Ionicons name="flame" size={20} color="#EA580C" />
             </View>
-            <View style={{ marginLeft: 10 }}>
-              <Text style={[styles.streakTitle, { color: isDark ? '#F8FAFC' : '#0F172A' }]}>
+            <View style={styles.streakTextCol}>
+              <Text style={[styles.streakTitle, { color: isDark ? '#F8FAFC' : '#0F172A' }]} numberOfLines={1}>
                 {language === 'bn' ? 'সাপ্তাহিক স্ট্রিক' : 'Weekly Streak'}
               </Text>
-              <Text style={[styles.streakCount, { color: isDark ? '#E2E8F0' : '#334155' }]}>
-                {dashboard.on_track_streak || 2} {language === 'bn' ? 'দিন একটানা' : 'days in a row'}
+              <Text style={[styles.streakCount, { color: isDark ? '#E2E8F0' : '#334155' }]} numberOfLines={1}>
+                {dashboard.on_track_streak || 1} {language === 'bn' ? 'দিন একটানা' : 'days in a row'}
               </Text>
-              <Text style={[styles.streakSub, { color: isDark ? '#94A3B8' : '#64748B' }]}>
+              <Text style={[styles.streakSub, { color: isDark ? '#94A3B8' : '#64748B' }]} numberOfLines={1}>
                 {language === 'bn' ? 'চালিয়ে যান!' : 'Keep going!'}
               </Text>
             </View>
@@ -638,7 +638,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
           <View style={styles.streakDaysRow}>
             {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, idx) => {
-              const activeStreak = dashboard.on_track_streak || 2;
+              const activeStreak = dashboard.on_track_streak || 1;
               const isChecked = idx < activeStreak;
               return (
                 <View key={idx} style={styles.streakDayNode}>
@@ -648,11 +648,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       {
                         backgroundColor: isChecked
                           ? '#10B981'
-                          : (isDark ? 'rgba(255, 255, 255, 0.1)' : '#E2E8F0'),
+                          : (isDark ? 'rgba(255, 255, 255, 0.12)' : '#E2E8F0'),
                       },
                     ]}
                   >
-                    {isChecked && <Ionicons name="checkmark" size={11} color="#FFFFFF" />}
+                    {isChecked && <Ionicons name="checkmark" size={9} color="#FFFFFF" />}
                   </View>
                   <Text style={[styles.streakDayLabel, { color: isDark ? '#94A3B8' : '#64748B' }]}>
                     {day}
@@ -1060,7 +1060,8 @@ const styles = StyleSheet.create({
   weeklyStreakCard: {
     borderRadius: 22,
     borderWidth: 1,
-    padding: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
     marginBottom: 14,
     flexDirection: 'row',
     alignItems: 'center',
@@ -1069,45 +1070,55 @@ const styles = StyleSheet.create({
   streakLeftWrap: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
+    marginRight: 8,
   },
   flameIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: '#FFEDD5',
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
+  },
+  streakTextCol: {
+    marginLeft: 8,
+    flex: 1,
   },
   streakTitle: {
     fontSize: 13,
     fontWeight: '700',
   },
   streakCount: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
-    marginVertical: 1,
+    marginTop: 1,
   },
   streakSub: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '500',
   },
   streakDaysRow: {
     flexDirection: 'row',
-    gap: 6,
+    alignItems: 'center',
+    gap: 4,
+    flexShrink: 0,
   },
   streakDayNode: {
     alignItems: 'center',
+    width: 17,
   },
   streakDayDot: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+    width: 17,
+    height: 17,
+    borderRadius: 8.5,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 3,
+    marginBottom: 2,
   },
   streakDayLabel: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '600',
   },
   smartTipCard: {

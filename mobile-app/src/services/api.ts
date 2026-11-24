@@ -66,7 +66,7 @@ export async function fetchWithTimeout(url: string, options: RequestInit = {}, t
 }
 
 // Storage Keys
-const STORAGE_KEYS = {
+export const STORAGE_KEYS = {
   TOKEN: '@student_finance_token',
   USER: '@student_finance_user',
   DASHBOARD_CACHE: '@student_finance_dash_cache',
@@ -473,6 +473,9 @@ export async function authLogin(email: string, password: string): Promise<AuthRe
   const data: AuthResponse = await res.json();
   await saveAuthToken(data.token);
   await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(data.user));
+  if (data.has_profile) {
+    await AsyncStorage.setItem(`@student_has_onboarded_${data.user.id}`, 'true');
+  }
   return data;
 }
 
@@ -491,6 +494,9 @@ export async function authRegister(email: string, password: string, fullName: st
   const data: AuthResponse = await res.json();
   await saveAuthToken(data.token);
   await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(data.user));
+  if (data.has_profile) {
+    await AsyncStorage.setItem(`@student_has_onboarded_${data.user.id}`, 'true');
+  }
   return data;
 }
 
@@ -504,6 +510,9 @@ export async function authDemo(): Promise<AuthResponse> {
       const data: AuthResponse = await res.json();
       await saveAuthToken(data.token);
       await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(data.user));
+      if (data.has_profile) {
+        await AsyncStorage.setItem(`@student_has_onboarded_${data.user.id}`, 'true');
+      }
       return data;
     }
   } catch (e) {
@@ -745,6 +754,9 @@ export async function authGoogle(
       const data: AuthResponse = await res.json();
       await saveAuthToken(data.token);
       await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(data.user));
+      if (data.has_profile) {
+        await AsyncStorage.setItem(`@student_has_onboarded_${data.user.id}`, 'true');
+      }
       return data;
     }
   } catch (e) {
@@ -1001,7 +1013,12 @@ export async function saveBaselineProfile(profile: BaselineProfileData): Promise
     throw new Error(err.detail || 'Profile save failed');
   }
 
-  return await res.json();
+  const savedData = await res.json();
+  if (profile.user_id) {
+    await AsyncStorage.setItem(`@student_has_onboarded_${profile.user_id}`, 'true');
+    await AsyncStorage.setItem(`@student_profile_${profile.user_id}`, JSON.stringify(savedData));
+  }
+  return savedData;
 }
 
 export async function getStudentProfile(userId: string): Promise<any> {
@@ -1011,9 +1028,22 @@ export async function getStudentProfile(userId: string): Promise<any> {
   }
   try {
     const res = await fetchWithTimeout(`${API_BASE_URL}/api/profile/${userId}`, {}, 8000);
-    if (res.ok) return await res.json();
+    if (res.ok) {
+      const data = await res.json();
+      if (data) {
+        await AsyncStorage.setItem(`@student_has_onboarded_${userId}`, 'true');
+        await AsyncStorage.setItem(`@student_profile_${userId}`, JSON.stringify(data));
+      }
+      return data;
+    }
   } catch (e) {
-    // Offline fallback
+    // Offline / Render cold start fallback
+  }
+  const cached = await AsyncStorage.getItem(`@student_profile_${userId}`);
+  if (cached) {
+    try {
+      return JSON.parse(cached);
+    } catch {}
   }
   return null;
 }

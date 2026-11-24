@@ -68,3 +68,4 @@ export function suggestCallingNames(fullName?: string | null): string[] {
 
   return candidates.length ? candidates : parts;
 }
+

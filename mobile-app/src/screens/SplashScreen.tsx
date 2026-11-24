@@ -89,10 +89,30 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ language, onFinish }
       }).start();
 
       try {
-        const [storedUser, pinConfigured] = await Promise.all([
-          getStoredUser(),
-          hasPinConfigured(),
-        ]);
+        let storedUser = await getStoredUser();
+
+        // Also check Supabase active session if AsyncStorage user token was cleared
+        if (!storedUser) {
+          try {
+            const { supabase } = await import('../services/supabaseClient');
+            const { data } = await supabase.auth.getSession();
+            if (data?.session?.user) {
+              const uEmail = data.session.user.email || '';
+              const uName =
+                data.session.user.user_metadata?.full_name ||
+                data.session.user.user_metadata?.name ||
+                uEmail.split('@')[0];
+              const uAvatar =
+                data.session.user.user_metadata?.avatar_url ||
+                data.session.user.user_metadata?.picture;
+              const { authGoogle } = await import('../services/api');
+              const authRes = await authGoogle(uEmail, uName, uAvatar);
+              storedUser = authRes.user;
+            }
+          } catch {}
+        }
+
+        const pinConfigured = await hasPinConfigured();
         safeFinish({
           user: storedUser,
           hasPin: pinConfigured,
@@ -102,10 +122,15 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ language, onFinish }
       }
     }, 950);
 
-    // 5. Safety watchdog timer (guarantees splash never freezes app even on network/storage delay)
-    const safetyTimer = setTimeout(() => {
-      safeFinish({ user: null, hasPin: false });
-    }, 2200);
+    // 5. Safety watchdog timer (guarantees splash never freezes app, but attempts reading stored user first)
+    const safetyTimer = setTimeout(async () => {
+      try {
+        const u = await getStoredUser();
+        safeFinish({ user: u, hasPin: false });
+      } catch {
+        safeFinish({ user: null, hasPin: false });
+      }
+    }, 3200);
 
     return () => {
       isMounted = false;
