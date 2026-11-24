@@ -275,7 +275,7 @@ export const AiCoachScreen: React.FC<AiCoachScreenProps> = ({
               <Text style={[styles.lockSub, { color: theme.textSecondary }]}>{t.proModalSub}</Text>
 
               {/* Feature Checklist */}
-              <View style={[styles.lockFeaturesList, { backgroundColor: isDark ? '#141E2B' : '#F6F9FC', borderColor: theme.border }]}>
+              <View style={[styles.lockFeaturesList, { backgroundColor: isDark ? '#16191D' : '#F6F9FC', borderColor: theme.border }]}>
                 <View style={styles.lockFeatureItem}>
                   <View style={[styles.checkCircle, { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.2)' : '#D1FAE5' }]}>
                     <Ionicons name="checkmark" size={14} color="#10B981" />
@@ -317,7 +317,7 @@ export const AiCoachScreen: React.FC<AiCoachScreenProps> = ({
 
               {/* Demo Activation */}
               <TouchableOpacity
-                style={[styles.demoUnlockBtn, { backgroundColor: isDark ? '#141E2B' : '#EDF4F9', borderColor: theme.borderMedium }]}
+                style={[styles.demoUnlockBtn, { backgroundColor: isDark ? '#16191D' : '#EDF4F9', borderColor: theme.borderMedium }]}
                 onPress={handleDemoUnlock}
                 disabled={demoLoading}
                 activeOpacity={0.8}
@@ -348,7 +348,7 @@ export const AiCoachScreen: React.FC<AiCoachScreenProps> = ({
                 </Text>
               </View>
 
-              <View style={[styles.teaserItem, { backgroundColor: isDark ? '#141E2B' : '#F6F9FC', borderColor: theme.border }]}>
+              <View style={[styles.teaserItem, { backgroundColor: isDark ? '#16191D' : '#F6F9FC', borderColor: theme.border }]}>
                 <View style={styles.teaserItemHeader}>
                   <Ionicons name="bulb-outline" size={16} color={theme.primary} />
                   <Text style={[styles.teaserTitle, { color: theme.textPrimary }]}>{t.dailyAdviceTitle}</Text>
@@ -360,7 +360,7 @@ export const AiCoachScreen: React.FC<AiCoachScreenProps> = ({
                 </Text>
               </View>
 
-              <View style={[styles.teaserItem, { backgroundColor: isDark ? '#141E2B' : '#F6F9FC', borderColor: theme.border }]}>
+              <View style={[styles.teaserItem, { backgroundColor: isDark ? '#16191D' : '#F6F9FC', borderColor: theme.border }]}>
                 <View style={styles.teaserItemHeader}>
                   <Ionicons name="calculator-outline" size={16} color={theme.headerBlock} />
                   <Text style={[styles.teaserTitle, { color: theme.textPrimary }]}>{t.simulatorTitle}</Text>
@@ -377,7 +377,7 @@ export const AiCoachScreen: React.FC<AiCoachScreenProps> = ({
           /* PRO ACTIVE VIEW */
           <View>
             {/* 3-Segmented Mode Selector */}
-            <View style={[styles.segmentContainer, { backgroundColor: isDark ? '#141E2B' : '#E2EAF1', borderColor: theme.border }]}>
+            <View style={[styles.segmentContainer, { backgroundColor: isDark ? '#16191D' : '#E2EAF1', borderColor: theme.border }]}>
               <TouchableOpacity
                 style={[
                   styles.segmentBtn,
@@ -614,7 +614,7 @@ export const AiCoachScreen: React.FC<AiCoachScreenProps> = ({
                               backgroundColor: isSelected
                                 ? theme.terracottaSoft
                                 : isDark
-                                ? '#141E2B'
+                                ? '#16191D'
                                 : '#EDF4F9',
                               borderColor: isSelected ? theme.primary : theme.border,
                             },
@@ -692,7 +692,7 @@ export const AiCoachScreen: React.FC<AiCoachScreenProps> = ({
 
                     {/* Impact Matrix */}
                     <View style={styles.impactGrid}>
-                      <View style={[styles.impactTile, { backgroundColor: isDark ? '#141E2B' : '#F6F9FC', borderColor: theme.border }]}>
+                      <View style={[styles.impactTile, { backgroundColor: isDark ? '#16191D' : '#F6F9FC', borderColor: theme.border }]}>
                         <Text style={[styles.impactLabel, { color: theme.textMuted }]}>{t.riskImpact}</Text>
                         <Text style={[styles.impactValue, { color: theme.textPrimary }]}>
                           {simResult.current_risk_pct}% → {simResult.simulated_risk_pct}%
@@ -714,7 +714,7 @@ export const AiCoachScreen: React.FC<AiCoachScreenProps> = ({
                         </Text>
                       </View>
 
-                      <View style={[styles.impactTile, { backgroundColor: isDark ? '#141E2B' : '#F6F9FC', borderColor: theme.border }]}>
+                      <View style={[styles.impactTile, { backgroundColor: isDark ? '#16191D' : '#F6F9FC', borderColor: theme.border }]}>
                         <Text style={[styles.impactLabel, { color: theme.textMuted }]}>{t.dailySafeImpact}</Text>
                         <Text style={[styles.impactValue, { color: theme.textPrimary }]}>
                           ৳{simResult.current_daily_safe} → ৳{simResult.simulated_daily_safe}
@@ -732,7 +732,7 @@ export const AiCoachScreen: React.FC<AiCoachScreenProps> = ({
 
                     {/* Target Savings Impact */}
                     {Boolean(simResult.savings_goal_impact) && (
-                      <View style={[styles.aiBox, { backgroundColor: isDark ? '#141E2B' : '#F6F9FC', borderLeftColor: '#10B981' }]}>
+                      <View style={[styles.aiBox, { backgroundColor: isDark ? '#16191D' : '#F6F9FC', borderLeftColor: '#10B981' }]}>
                         <Text style={[styles.aiBoxHeader, { color: '#10B981' }]}>
                           {language === 'bn' ? 'সঞ্চয় লক্ষ্য ও তহবিলের প্রভাব' : 'Savings Goal & Reserve Impact'}
                         </Text>
@@ -743,7 +743,7 @@ export const AiCoachScreen: React.FC<AiCoachScreenProps> = ({
                     )}
 
                     {/* Coach Reasoning */}
-                    <View style={[styles.aiBox, { backgroundColor: isDark ? '#141E2B' : '#F6F9FC', borderLeftColor: theme.primary }]}>
+                    <View style={[styles.aiBox, { backgroundColor: isDark ? '#16191D' : '#F6F9FC', borderLeftColor: theme.primary }]}>
                       <Text style={[styles.aiBoxHeader, { color: theme.primary }]}>{t.aiReasoning}</Text>
                       <Text style={[styles.aiBoxBody, { color: theme.textSecondary }]}>
                         {language === 'bn'
@@ -753,7 +753,7 @@ export const AiCoachScreen: React.FC<AiCoachScreenProps> = ({
                     </View>
 
                     {/* Alternative */}
-                    <View style={[styles.aiBox, { backgroundColor: isDark ? '#141E2B' : '#F6F9FC', borderLeftColor: theme.headerBlock }]}>
+                    <View style={[styles.aiBox, { backgroundColor: isDark ? '#16191D' : '#F6F9FC', borderLeftColor: theme.headerBlock }]}>
                       <Text style={[styles.aiBoxHeader, { color: theme.headerBlock }]}>{t.alternativeSuggestions}</Text>
                       <Text style={[styles.aiBoxBody, { color: theme.textSecondary }]}>
                         {language === 'bn'
@@ -803,7 +803,7 @@ export const AiCoachScreen: React.FC<AiCoachScreenProps> = ({
                         style={[
                           styles.presetChipBtn,
                           {
-                            backgroundColor: isDark ? '#141E2B' : '#F6F9FC',
+                            backgroundColor: isDark ? '#16191D' : '#F6F9FC',
                             borderColor: theme.border,
                           },
                         ]}
@@ -886,7 +886,7 @@ export const AiCoachScreen: React.FC<AiCoachScreenProps> = ({
                         </View>
 
                         {/* Coach Answer */}
-                        <View style={[styles.answerRow, { backgroundColor: isDark ? '#141E2B' : '#F8FAFC', borderColor: theme.borderSubtle }]}>
+                        <View style={[styles.answerRow, { backgroundColor: isDark ? '#16191D' : '#F8FAFC', borderColor: theme.borderSubtle }]}>
                           <View style={[styles.chatAvatar, { backgroundColor: theme.terracottaSoft }]}>
                             <Ionicons name="chatbubble-ellipses-outline" size={12} color={theme.primary} />
                           </View>

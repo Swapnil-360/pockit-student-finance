@@ -1046,7 +1046,7 @@ export const CalendarLedgerScreen: React.FC<CalendarLedgerScreenProps> = ({
                           </Text>
                         ) : null}
                         <View style={styles.tagRow}>
-                          <View style={[styles.pmBadge, { backgroundColor: isDark ? '#141E2B' : '#E2EBF2' }]}>
+                          <View style={[styles.pmBadge, { backgroundColor: isDark ? '#16191D' : '#E2EBF2' }]}>
                             <Text style={[styles.pmBadgeText, { color: theme.textSecondary }]}>
                               {tx.payment_method}
                             </Text>
@@ -1113,7 +1113,7 @@ export const CalendarLedgerScreen: React.FC<CalendarLedgerScreenProps> = ({
         }}
       >
         <View style={styles.modalBackdrop}>
-          <GlassCard style={[styles.confirmCard, { backgroundColor: isDark ? '#141E2B' : '#FFFFFF', borderColor: isDark ? 'rgba(255,255,255,0.1)' : '#E2EBF2' }]}>
+          <GlassCard style={[styles.confirmCard, { backgroundColor: isDark ? '#1A1D21' : '#FFFFFF', borderColor: isDark ? 'rgba(255,255,255,0.1)' : '#E2EBF2' }]}>
             <View style={[styles.confirmIconCircle, { backgroundColor: isDark ? 'rgba(239, 68, 68, 0.15)' : '#FEE2E2' }]}>
               <Ionicons name="trash-outline" size={24} color="#EF4444" />
             </View>

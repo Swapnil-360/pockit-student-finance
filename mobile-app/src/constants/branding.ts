@@ -44,8 +44,8 @@ export const BRANDING = {
     emeraldTakaLight: '#34D399',
     amberWarning: '#F59E0B',
     roseAlert: '#EF4444',
-    obsidianBase: '#090D16',
-    charcoalSurface: '#111827',
+    obsidianBase: '#121417',
+    charcoalSurface: '#1A1D21',
   },
 
   // Support & Metadata

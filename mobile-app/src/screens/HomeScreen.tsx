@@ -248,7 +248,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             onRefresh={handlePullToRefresh}
             colors={[theme.primary]}
             tintColor={theme.primary}
-            progressBackgroundColor={isDark ? '#1E293B' : '#FFFFFF'}
+            progressBackgroundColor={isDark ? '#1A1D21' : '#FFFFFF'}
           />
         }
       >
@@ -310,7 +310,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           style={[
             styles.heroCard,
             {
-              backgroundColor: isDark ? 'rgba(23, 37, 56, 0.85)' : '#FFFFFF',
+              backgroundColor: isDark ? '#1A1D21' : '#FFFFFF',
               borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(83, 122, 150, 0.12)',
               shadowColor: isDark ? '#000000' : '#466B85',
             },
@@ -420,7 +420,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             style={[
               styles.statCardItem,
               {
-                backgroundColor: isDark ? 'rgba(23, 37, 56, 0.85)' : '#FFFFFF',
+                backgroundColor: isDark ? '#1A1D21' : '#FFFFFF',
                 borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(83, 122, 150, 0.12)',
                 shadowColor: isDark ? '#000000' : '#466B85',
               },
@@ -447,7 +447,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             style={[
               styles.statCardItem,
               {
-                backgroundColor: isDark ? 'rgba(23, 37, 56, 0.85)' : '#FFFFFF',
+                backgroundColor: isDark ? '#1A1D21' : '#FFFFFF',
                 borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(83, 122, 150, 0.12)',
                 shadowColor: isDark ? '#000000' : '#466B85',
               },
@@ -474,7 +474,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             style={[
               styles.statCardItem,
               {
-                backgroundColor: isDark ? 'rgba(23, 37, 56, 0.85)' : '#FFFFFF',
+                backgroundColor: isDark ? '#1A1D21' : '#FFFFFF',
                 borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(83, 122, 150, 0.12)',
                 shadowColor: isDark ? '#000000' : '#466B85',
               },
@@ -512,7 +512,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           style={[
             styles.dreamGoalCard,
             {
-              backgroundColor: isDark ? 'rgba(23, 37, 56, 0.85)' : '#FFFFFF',
+              backgroundColor: isDark ? '#1A1D21' : '#FFFFFF',
               borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(83, 122, 150, 0.12)',
               shadowColor: isDark ? '#000000' : '#466B85',
             },
@@ -700,7 +700,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           style={[
             styles.smartTipCard,
             {
-              backgroundColor: isDark ? 'rgba(23, 37, 56, 0.85)' : '#F0F9FF',
+              backgroundColor: isDark ? '#1A1D21' : '#F0F9FF',
               borderColor: isDark ? 'rgba(56, 189, 248, 0.25)' : '#E0F2FE',
             },
           ]}

@@ -40,7 +40,7 @@ export const SavingsGoalCard: React.FC<SavingsGoalCardProps> = ({
         style={[
           styles.container,
           {
-            backgroundColor: isDark ? 'rgba(23, 37, 56, 0.7)' : '#FFFFFF',
+            backgroundColor: isDark ? '#1A1D21' : '#FFFFFF',
             borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(83, 122, 150, 0.12)',
             shadowColor: isDark ? '#000000' : '#466B85',
           },
@@ -91,7 +91,7 @@ export const SavingsGoalCard: React.FC<SavingsGoalCardProps> = ({
       style={[
         styles.container,
         {
-          backgroundColor: isDark ? 'rgba(23, 37, 56, 0.7)' : '#FFFFFF',
+          backgroundColor: isDark ? '#1A1D21' : '#FFFFFF',
           borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(83, 122, 150, 0.12)',
           shadowColor: isDark ? '#000000' : '#466B85',
         },

@@ -440,7 +440,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         </View>
 
         {/* Tab Toggle: Sign In / Sign Up */}
-        <View style={[styles.segmentContainer, { backgroundColor: isDark ? '#141E2B' : '#E2EAF1', borderColor: theme.border }]}>
+        <View style={[styles.segmentContainer, { backgroundColor: isDark ? '#16191D' : '#E2EAF1', borderColor: theme.border }]}>
           <TouchableOpacity
             style={[styles.segmentBtn, !isSignUp && [styles.segmentBtnActive, { backgroundColor: theme.surface, borderColor: theme.borderMedium }]]}
             onPress={() => setIsSignUp(false)}
@@ -585,7 +585,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               <View style={styles.inputGroup}>
                 <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>{t.nameLabel}</Text>
                 <TextInput
-                  style={[styles.input, { backgroundColor: isDark ? '#111A24' : '#F6F9FC', borderColor: theme.border, color: theme.textPrimary }]}
+                  style={[styles.input, { backgroundColor: isDark ? '#16191D' : '#F6F9FC', borderColor: theme.border, color: theme.textPrimary }]}
                   placeholder={language === 'bn' ? 'আপনার পূর্ণ নাম' : 'Your full name'}
                   placeholderTextColor={theme.textMuted}
                   value={customGoogleName}
@@ -596,7 +596,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               <View style={[styles.inputGroup, { marginTop: 10 }]}>
                 <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>{t.emailLabel}</Text>
                 <TextInput
-                  style={[styles.input, { backgroundColor: isDark ? '#111A24' : '#F6F9FC', borderColor: theme.border, color: theme.textPrimary }]}
+                  style={[styles.input, { backgroundColor: isDark ? '#16191D' : '#F6F9FC', borderColor: theme.border, color: theme.textPrimary }]}
                   placeholder={language === 'bn' ? 'আপনার জিমেইল (যেমন: student@gmail.com)' : 'Your Gmail (e.g. student@gmail.com)'}
                   placeholderTextColor={theme.textMuted}
                   keyboardType="email-address"

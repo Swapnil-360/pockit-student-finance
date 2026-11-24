@@ -169,14 +169,14 @@ export const GoalsScreen: React.FC<GoalsScreenProps> = ({
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: isDark ? '#0D1624' : '#EEF3F7' }]}>
+    <View style={[styles.container, { backgroundColor: isDark ? '#121417' : '#EEF3F7' }]}>
       {/* Top Header */}
       <View
         style={[
           styles.header,
           {
             paddingTop: Math.max(insets.top, 16) + 10,
-            backgroundColor: isDark ? 'rgba(13, 22, 36, 0.9)' : 'rgba(238, 243, 247, 0.9)',
+            backgroundColor: isDark ? 'rgba(18, 20, 23, 0.95)' : 'rgba(238, 243, 247, 0.9)',
             borderBottomColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(83, 122, 150, 0.12)',
           },
         ]}
@@ -256,7 +256,7 @@ export const GoalsScreen: React.FC<GoalsScreenProps> = ({
                   style={[
                     styles.otherGoalCard,
                     {
-                      backgroundColor: isDark ? 'rgba(23, 37, 56, 0.7)' : '#FFFFFF',
+                      backgroundColor: isDark ? '#1A1D21' : '#FFFFFF',
                       borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(83, 122, 150, 0.12)',
                       shadowColor: isDark ? '#000000' : '#466B85',
                     },

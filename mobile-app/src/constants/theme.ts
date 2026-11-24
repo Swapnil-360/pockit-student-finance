@@ -94,45 +94,45 @@ export const LIGHT_COLORS: ThemeColors = {
 };
 
 export const DARK_COLORS: ThemeColors = {
-  canvas: '#0B1120',           // deep obsidian slate canvas
-  background: '#0B1120',
-  surface: '#1E293B',          // elevated dark slate card
-  surfaceElevated: '#283548',
-  surfaceSubtle: 'rgba(255, 255, 255, 0.05)', // modern transparent glass tint
-  headerBlock: '#1E2E42',      // dusty slate dark header block
-  headerBlockAccent: 'rgba(186, 211, 230, 0.16)',
+  canvas: '#121417',           // Midnight charcoal canvas (pure, deep neutral charcoal)
+  background: '#121417',
+  surface: '#1A1D21',          // Elevated midnight charcoal card surface
+  surfaceElevated: '#22262B',  // Modals & elevated floating panels
+  surfaceSubtle: '#16191D',    // Subtle charcoal inset / pill background
+  headerBlock: '#1E2227',      // Midnight charcoal header block
+  headerBlockAccent: 'rgba(244, 123, 78, 0.14)',
   headerBlockText: '#F8FAFC',
-  primary: '#F47B4E',          // luminous warm terracotta
+  primary: '#F47B4E',          // Luminous warm terracotta (striking contrast against charcoal)
   primaryLight: '#FFA07A',
   primarySubtle: 'rgba(244, 123, 78, 0.16)',
   primaryBorder: '#F47B4E',
   terracotta: '#F47B4E',
   terracottaSoft: 'rgba(244, 123, 78, 0.16)',
-  slateBlue: '#93B3C8',        // high-contrast softened slate-blue
-  slateBlueTint: 'rgba(147, 179, 200, 0.18)',
-  powderBlue: '#324B60',
-  powderBlueLight: '#1E2E40',
-  powder: '#263B4D',
-  powderTint: '#182433',
-  textPrimary: '#F8FAFC',      // bright pure text (contrast 14:1)
-  textSecondary: '#CBD5E1',    // high-contrast soft silver-slate (contrast 8.5:1)
-  textMuted: '#94A3B8',        // clearly legible secondary steel (contrast 4.8:1)
-  border: 'rgba(255, 255, 255, 0.10)',
-  borderMedium: 'rgba(255, 255, 255, 0.18)',
-  borderSubtle: 'rgba(255, 255, 255, 0.05)',
+  slateBlue: '#A3B3C2',        // Muted charcoal-slate accent
+  slateBlueTint: 'rgba(163, 179, 194, 0.14)',
+  powderBlue: '#2A3038',
+  powderBlueLight: '#1E232A',
+  powder: '#242930',
+  powderTint: '#171A1F',
+  textPrimary: '#F8FAFC',      // Crisp, high-contrast text
+  textSecondary: '#A0AEC0',    // Clean charcoal-gray secondary text
+  textMuted: '#718096',        // Subtle muted charcoal helper text
+  border: 'rgba(255, 255, 255, 0.08)', // Delicate micro-border
+  borderMedium: 'rgba(255, 255, 255, 0.14)',
+  borderSubtle: 'rgba(255, 255, 255, 0.04)',
   borderFocus: '#F47B4E',
   accent: '#F47B4E',
   accentEmerald: '#10B981',
-  riskLow: '#10B981',          // vibrant emerald
-  riskLowBg: 'rgba(16, 185, 129, 0.16)',
+  riskLow: '#10B981',          // Vibrant emerald
+  riskLowBg: 'rgba(16, 185, 129, 0.14)',
   riskLowBorder: '#10B981',
   riskModerate: '#F59E0B',
   riskHigh: '#F47B4E',
-  riskHighBg: 'rgba(244, 123, 78, 0.16)',
+  riskHighBg: 'rgba(244, 123, 78, 0.14)',
   riskHighBorder: '#F47B4E',
-  cardBorder: 'rgba(255, 255, 255, 0.08)',
-  navBg: '#111827',
-  navBorder: 'rgba(255, 255, 255, 0.09)',
+  cardBorder: 'rgba(255, 255, 255, 0.07)',
+  navBg: '#14171A',            // Midnight charcoal navigation bar
+  navBorder: 'rgba(255, 255, 255, 0.08)',
   shadowColor: '#000000',
   primaryAccent: '#F47B4E',
   warningOrange: '#F59E0B',
