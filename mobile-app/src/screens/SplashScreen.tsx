@@ -160,7 +160,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ language, onFinish }
       activeOpacity={1}
       onPress={handleSkipSplash}
     >
-      <StatusBar style="light" />
+      <StatusBar style="dark" />
 
       {/* Modern Engineering Dot Grid Accents */}
       <DotGrid style={styles.gridTopLeft} />
@@ -191,8 +191,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ language, onFinish }
           />
         </Animated.View>
 
-        {/* Clean Bold Typography */}
-        <Text style={styles.appTitle}>{BRANDING.appName}</Text>
+        {/* Value Propositions / Taglines (Logo already contains the Pockit brand name & tagline) */}
         <Text style={styles.taglineEn}>{BRANDING.taglineEn}</Text>
         <Text style={styles.taglineBn}>{BRANDING.taglineBn}</Text>
       </Animated.View>
@@ -240,7 +239,7 @@ const DotGrid: React.FC<{ style?: any }> = ({ style }) => (
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#172330', // Deep dark slate/navy fintech canvas
+    backgroundColor: '#FFFFFF', // Clean, crisp Scandinavian light canvas so dark navy logo text & orange wallet pop with high contrast
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 24,
@@ -248,7 +247,7 @@ const styles = StyleSheet.create({
   },
   dotGridContainer: {
     position: 'absolute',
-    opacity: 0.16,
+    opacity: 0.35,
   },
   gridTopLeft: {
     top: 70,
@@ -267,46 +266,37 @@ const styles = StyleSheet.create({
     width: 3.5,
     height: 3.5,
     borderRadius: 2,
-    backgroundColor: '#8EA4BA',
+    backgroundColor: '#CBD5E1',
   },
   contentBox: {
     alignItems: 'center',
     width: '100%',
-    marginTop: -30,
+    marginTop: -20,
   },
   mascotContainer: {
-    width: 250,
-    height: 168,
+    width: 270,
+    height: 180,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 4,
+    marginBottom: 8,
   },
   mascotImage: {
     width: '100%',
     height: '100%',
   },
-  appTitle: {
-    fontSize: 32,
-    lineHeight: 38,
-    color: '#FFFFFF',
-    fontWeight: '800',
-    letterSpacing: 0.4,
-    textAlign: 'center',
-    marginTop: 12,
-  },
   taglineEn: {
     fontSize: 15,
     lineHeight: 22,
-    color: '#BAC8D5',
-    fontWeight: '500',
+    color: '#1E293B',
+    fontWeight: '600',
     textAlign: 'center',
-    marginTop: 10,
+    marginTop: 4,
     paddingHorizontal: 16,
   },
   taglineBn: {
-    fontSize: 14,
+    fontSize: 13.5,
     lineHeight: 20,
-    color: '#8E9FA9',
+    color: '#64748B',
     fontWeight: '400',
     textAlign: 'center',
     marginTop: 6,
@@ -320,23 +310,23 @@ const styles = StyleSheet.create({
   },
   progressBarTrack: {
     width: 264,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#243343',
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#E2E8F0',
     overflow: 'hidden',
   },
   progressBarFill: {
     height: '100%',
-    borderRadius: 5,
-    backgroundColor: '#F47B4E', // Vibrant Warm Terracotta
-    shadowColor: '#F47B4E',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.6,
-    shadowRadius: 8,
+    borderRadius: 4,
+    backgroundColor: '#EA580C', // Vibrant Warm Terracotta
+    shadowColor: '#EA580C',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
   },
   loadingText: {
     fontSize: 12,
-    color: '#7D90A3',
+    color: '#64748B',
     fontWeight: '500',
     marginTop: 10,
     textAlign: 'center',
@@ -347,7 +337,7 @@ const styles = StyleSheet.create({
     bottom: 24,
   },
   footerText: {
-    color: '#4B5E73',
+    color: '#94A3B8',
     fontSize: 11,
     letterSpacing: 0.5,
   },

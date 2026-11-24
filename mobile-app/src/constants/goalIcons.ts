@@ -80,3 +80,4 @@ export const getGoalIconName = (
   // Default fallback
   return 'trophy-outline';
 };
+
