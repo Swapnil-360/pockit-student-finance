@@ -305,9 +305,7 @@ export const SavingsGoalCard: React.FC<SavingsGoalCardProps> = ({
         >
           <Ionicons name="wallet-outline" size={16} color="#FFFFFF" style={{ marginRight: 5 }} />
           <Text style={styles.saveTargetBtnText} numberOfLines={1}>
-            {language === 'bn'
-              ? `টার্গেটে জমা (৳${Math.round(isTimelineMode ? (requiredMonthly || 500) : (goal.monthly_commitment || 500)).toLocaleString()})`
-              : `Save for Target (৳${Math.round(isTimelineMode ? (requiredMonthly || 500) : (goal.monthly_commitment || 500)).toLocaleString()})`}
+            {language === 'bn' ? 'টার্গেটে জমা' : 'Save for Target'}
           </Text>
         </TouchableOpacity>
 
@@ -556,7 +554,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   saveTargetBtn: {
-    flex: 1.25,
+    flex: 1,
     paddingHorizontal: 8,
   },
   saveTargetBtnText: {
@@ -573,7 +571,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   pauseBtn: {
-    flex: 0.95,
+    flex: 1,
     borderWidth: 1,
     paddingHorizontal: 6,
   },

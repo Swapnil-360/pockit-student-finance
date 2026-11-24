@@ -252,17 +252,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           />
         }
       >
-        {/* 1. Header: Pockit Logo + Title on Left; Notification Bell + Avatar on Right (Image 1 Style) */}
+        {/* 1. Header: Full Brand Logo on Left; Notification / Guide + Avatar on Right */}
         <View style={styles.headerBar}>
           <View style={styles.headerLeftBrand}>
             <Image
-              source={BRANDING.assets.wallet}
+              source={isDark ? BRANDING.assets.headerLogoDark : BRANDING.assets.headerLogo}
               style={styles.pockitLogoImg}
               resizeMode="contain"
             />
-            <Text style={[styles.pockitTitleText, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-              Pockit
-            </Text>
           </View>
 
           <View style={styles.headerRightActions}>
@@ -811,16 +808,10 @@ const styles = StyleSheet.create({
   headerLeftBrand: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
   },
   pockitLogoImg: {
-    width: 36,
-    height: 36,
-  },
-  pockitTitleText: {
-    fontSize: 22,
-    fontWeight: '800',
-    letterSpacing: -0.4,
+    width: 106,
+    height: 42,
   },
   headerRightActions: {
     flexDirection: 'row',
