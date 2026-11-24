@@ -269,8 +269,15 @@ function AppContent() {
 
   const handleAuthSuccess = async (authData: AuthResponse) => {
     setUser(authData.user);
-    setHasProfile(authData.has_profile);
-    if (authData.has_profile) {
+    let onboarded = authData.has_profile;
+    if (!onboarded) {
+      try {
+        const prof = await getStudentProfile(authData.user.id);
+        if (prof) onboarded = true;
+      } catch {}
+    }
+    setHasProfile(onboarded);
+    if (onboarded) {
       await AsyncStorage.setItem(`@student_has_onboarded_${authData.user.id}`, 'true');
       const dash = await fetchDashboard(authData.user.id);
       setDashboard(dash);

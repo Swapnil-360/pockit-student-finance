@@ -407,6 +407,7 @@ def login_user(req: UserLoginRequest):
             id=user['id'],
             email=user['email'],
             full_name=user['full_name'],
+            calling_name=user.get('calling_name'),
             is_demo=bool(user.get('is_demo', 0)),
             is_pro=pro_info['is_pro'],
             has_pin=has_pin,
@@ -432,6 +433,35 @@ def google_sign_in(req: GoogleAuthRequest):
             id=user['id'],
             email=user['email'],
             full_name=user['full_name'],
+            calling_name=user.get('calling_name'),
+            is_demo=bool(user.get('is_demo', 0)),
+            is_pro=pro_info['is_pro'],
+            has_pin=has_pin,
+            avatar_url=user.get('avatar_url'),
+            subscription_expiry=pro_info.get('expiry')
+        ),
+        has_profile=profile is not None,
+        token=token
+    )
+
+
+@app.get("/api/user/by-email/{email}", response_model=AuthResponse)
+def get_user_by_email(email: str):
+    """Restores user profile and authentication context by email (useful on cloud cold starts)."""
+    user = db.get_user_by_email(email)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+    profile = db.get_profile(user["id"])
+    token = f"token_{user['id']}"
+    pro_info = db.check_pro_status(user['id'])
+    has_pin = bool(user.get('pin_code_hash'))
+    return AuthResponse(
+        status="success",
+        user=UserData(
+            id=user['id'],
+            email=user['email'],
+            full_name=user['full_name'],
+            calling_name=user.get('calling_name'),
             is_demo=bool(user.get('is_demo', 0)),
             is_pro=pro_info['is_pro'],
             has_pin=has_pin,
@@ -635,6 +665,10 @@ def save_onboarding_profile(req: BaselineProfileRequest):
 @app.get("/api/profile/{user_id}", response_model=ProfileResponse)
 def get_student_profile(user_id: str):
     profile = db.get_profile(user_id)
+    if not profile and "@" in user_id:
+        user = db.get_user_by_email(user_id)
+        if user:
+            profile = db.get_profile(user["id"])
     if not profile:
         raise HTTPException(status_code=404, detail="Student profile not found.")
     return ProfileResponse(**profile)

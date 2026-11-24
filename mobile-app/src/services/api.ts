@@ -42,7 +42,7 @@ const getInitialBaseUrl = (): string => {
   }
 
   // 5. Standalone Android APK default production cloud endpoint
-  return 'https://pockit-backend.onrender.com';
+  return 'https://pockit-backend-eppq.onrender.com';
 };
 
 export let API_BASE_URL = getInitialBaseUrl();
@@ -1035,6 +1035,27 @@ export async function getStudentProfile(userId: string): Promise<any> {
         await AsyncStorage.setItem(`@student_profile_${userId}`, JSON.stringify(data));
       }
       return data;
+    }
+
+    // If 404, try restoring by email if stored user exists
+    if (res.status === 404) {
+      const storedUserStr = await AsyncStorage.getItem(STORAGE_KEYS.USER);
+      if (storedUserStr) {
+        const u = JSON.parse(storedUserStr);
+        if (u?.email) {
+          const emailRes = await fetchWithTimeout(`${API_BASE_URL}/api/user/by-email/${encodeURIComponent(u.email)}`, {}, 8000);
+          if (emailRes.ok) {
+            const authData: AuthResponse = await emailRes.json();
+            if (authData.has_profile && (authData as any).profile) {
+              const prof = (authData as any).profile;
+              await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(authData.user));
+              await AsyncStorage.setItem(`@student_has_onboarded_${authData.user.id}`, 'true');
+              await AsyncStorage.setItem(`@student_profile_${authData.user.id}`, JSON.stringify(prof));
+              return prof;
+            }
+          }
+        }
+      }
     }
   } catch (e) {
     // Offline / Render cold start fallback

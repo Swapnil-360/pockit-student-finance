@@ -17,6 +17,33 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 from config import SQLITE_DB_PATH, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, USE_SUPABASE
 
+# Exact columns present in Supabase Cloud schema to prevent PGRST204 errors
+SUPABASE_PROFILE_COLUMNS = {
+    'user_id', 'gender', 'age', 'year_of_study', 'university_type', 'where_you_live',
+    'total_monthly_money', 'main_source_of_money', 'do_you_earn_income',
+    'monthly_rent_fixed', 'monthly_allowance_fixed', 'savings_goal_fixed',
+    'target_savings', 'track_spending', 'mobile_banking_use',
+    'borrowed_from_friends_baseline', 'aware_balance', 'aware_weekly_track',
+    'aware_check_before_buy', 'impulse_spontaneous', 'impulse_discounts',
+    'impulse_regret', 'awareness_score', 'impulse_score', 'is_pro',
+    'subscription_expiry', 'pin_code_hash', 'avatar_url',
+    'daily_coach_queries_used', 'daily_coach_queries_date'
+}
+
+SUPABASE_GOAL_COLUMNS = {
+    'id', 'user_id', 'title', 'target_amount', 'current_saved',
+    'monthly_commitment', 'is_paused', 'missed_months', 'category',
+    'start_date', 'is_active'
+}
+
+SUPABASE_INCOME_COLUMNS = {
+    'id', 'user_id', 'amount', 'source', 'payment_method', 'note', 'date'
+}
+
+SUPABASE_EXPENSE_COLUMNS = {
+    'id', 'user_id', 'amount', 'category', 'payment_method', 'note', 'date'
+}
+
 
 class Database:
     def __init__(self, db_path=SQLITE_DB_PATH):
@@ -393,34 +420,102 @@ class Database:
             conn.commit()
 
 
-    # --- USER AUTHENTICATION ---
-    def create_user(self, email: str, password: str, full_name: str) -> Dict[str, Any]:
-        user_id = str(uuid.uuid4())
-        hashed = self._hash_password(password)
+    # --- USER AUTHENTICATION & SUPABASE CLOUD SYNC ---
+    def _get_supabase_auth_user(self, email: str) -> Optional[Any]:
+        """Looks up an active auth user in Supabase by email."""
+        if not self.supabase:
+            return None
+        try:
+            users = self.supabase.auth.admin.list_users()
+            email_lower = email.lower().strip()
+            for u in users:
+                if u.email and u.email.lower().strip() == email_lower:
+                    return u
+        except Exception as e:
+            print(f"[Supabase sync notice] _get_supabase_auth_user: {e}")
+        return None
+
+    def get_user_by_email(self, email: str) -> Optional[Dict[str, Any]]:
+        """Retrieves user profile info by email, checking SQLite then Supabase."""
+        email_clean = email.lower().strip()
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT id FROM users WHERE email = ?", (email.lower().strip(),))
-            if cursor.fetchone():
-                raise ValueError("An account with this email already exists.")
-            cursor.execute("""
-                INSERT INTO users (id, email, password_hash, full_name)
-                VALUES (?, ?, ?, ?)
-            """, (user_id, email.lower().strip(), hashed, full_name.strip()))
-            conn.commit()
+            cursor.execute("SELECT id, email, full_name, calling_name, is_demo, is_pro, subscription_expiry, pin_code_hash, avatar_url FROM users WHERE email = ?", (email_clean,))
+            row = cursor.fetchone()
+            if row:
+                return dict(row)
+
+        if self.supabase:
+            sb_u = self._get_supabase_auth_user(email_clean)
+            if sb_u:
+                full_name = sb_u.user_metadata.get('full_name') or sb_u.user_metadata.get('name') or email_clean.split('@')[0]
+                avatar = sb_u.user_metadata.get('avatar_url') or sb_u.user_metadata.get('picture')
+                calling_name = sb_u.user_metadata.get('calling_name')
+                if not calling_name and 'Swapnil' in full_name:
+                    calling_name = 'Swapnil'
+                fake_hash = self._hash_password(str(uuid.uuid4()))
+                with self._get_connection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("""
+                        INSERT OR REPLACE INTO users (id, email, password_hash, full_name, calling_name, avatar_url, is_demo, is_pro)
+                        VALUES (?, ?, ?, ?, ?, ?, 0, 0)
+                    """, (sb_u.id, email_clean, fake_hash, full_name, calling_name, avatar))
+                    conn.commit()
+                # Restore profile and related data
+                self.get_profile(sb_u.id)
+                self.get_user_goals(sb_u.id)
+                self.get_expenses(sb_u.id)
+                self.get_incomes(sb_u.id)
+                return {
+                    "id": sb_u.id,
+                    "email": email_clean,
+                    "full_name": full_name,
+                    "calling_name": calling_name,
+                    "avatar_url": avatar,
+                    "is_demo": 0,
+                    "is_pro": 0,
+                    "subscription_expiry": None,
+                    "pin_code_hash": None
+                }
+        return None
+
+    def create_user(self, email: str, password: str, full_name: str) -> Dict[str, Any]:
+        email_clean = email.lower().strip()
+        user_id = str(uuid.uuid4())
+        hashed = self._hash_password(password)
 
         if self.supabase:
             try:
-                self.supabase.auth.admin.create_user({
-                    'id': user_id,
-                    'email': email.lower().strip(),
+                sb_user = self.supabase.auth.admin.create_user({
+                    'email': email_clean,
                     'password': password,
                     'email_confirm': True,
                     'user_metadata': {'full_name': full_name.strip()}
                 })
+                if sb_user and getattr(sb_user, 'user', None):
+                    user_id = sb_user.user.id
             except Exception as e:
                 print(f"[Supabase sync notice] Auth user creation: {e}")
+                existing_u = self._get_supabase_auth_user(email_clean)
+                if existing_u:
+                    user_id = existing_u.id
 
-        return {"id": user_id, "email": email.lower().strip(), "full_name": full_name}
+        calling_val = None
+        if 'Swapnil' in full_name:
+            calling_val = 'Swapnil'
+
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id FROM users WHERE email = ?", (email_clean,))
+            if cursor.fetchone():
+                raise ValueError("An account with this email already exists.")
+            cursor.execute("""
+                INSERT INTO users (id, email, password_hash, full_name, calling_name)
+                VALUES (?, ?, ?, ?, ?)
+            """, (user_id, email_clean, hashed, full_name.strip(), calling_val))
+            conn.commit()
+
+        return {"id": user_id, "email": email_clean, "full_name": full_name, "calling_name": calling_val}
 
     def authenticate_user(self, email: str, password: str) -> Optional[Dict[str, Any]]:
         hashed = self._hash_password(password)
@@ -433,19 +528,114 @@ class Database:
             row = cursor.fetchone()
             if row:
                 return dict(row)
-            return None
+
+        # Supabase Cloud fallback (e.g. if Render container was restarted)
+        if self.supabase:
+            try:
+                auth_res = self.supabase.auth.sign_in_with_password({
+                    'email': email.lower().strip(),
+                    'password': password
+                })
+                if auth_res and getattr(auth_res, 'user', None):
+                    u = auth_res.user
+                    full_name = u.user_metadata.get('full_name') or email.split('@')[0]
+                    avatar = u.user_metadata.get('avatar_url')
+                    calling_name = u.user_metadata.get('calling_name')
+                    if not calling_name and 'Swapnil' in full_name:
+                        calling_name = 'Swapnil'
+                    with self._get_connection() as conn:
+                        cursor = conn.cursor()
+                        cursor.execute("""
+                            INSERT OR REPLACE INTO users (id, email, password_hash, full_name, calling_name, avatar_url, is_demo, is_pro)
+                            VALUES (?, ?, ?, ?, ?, ?, 0, 0)
+                        """, (u.id, email.lower().strip(), hashed, full_name, calling_name, avatar))
+                        conn.commit()
+                    self.get_profile(u.id)
+                    self.get_user_goals(u.id)
+                    self.get_expenses(u.id)
+                    self.get_incomes(u.id)
+                    return {
+                        'id': u.id,
+                        'email': email.lower().strip(),
+                        'full_name': full_name,
+                        'calling_name': calling_name,
+                        'is_demo': 0,
+                        'is_pro': 0,
+                        'subscription_expiry': None,
+                        'pin_code_hash': None,
+                        'avatar_url': avatar
+                    }
+            except Exception as e_sb:
+                print(f"[Supabase auth signin notice]: {e_sb}")
+
+        return None
 
     def get_user(self, user_id: str) -> Optional[Dict[str, Any]]:
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT id, email, full_name, calling_name, is_demo, is_pro, subscription_expiry, pin_code_hash, avatar_url FROM users WHERE id = ?", (user_id,))
             row = cursor.fetchone()
-            return dict(row) if row else None
+            if row:
+                return dict(row)
+
+        if self.supabase:
+            try:
+                sb_uid = self._to_uuid(user_id)
+                sb_res = self.supabase.auth.admin.get_user_by_id(sb_uid)
+                if sb_res and getattr(sb_res, 'user', None):
+                    u = sb_res.user
+                    full_name = u.user_metadata.get('full_name') or (u.email.split('@')[0] if u.email else 'User')
+                    avatar = u.user_metadata.get('avatar_url') or u.user_metadata.get('picture')
+                    calling_name = u.user_metadata.get('calling_name')
+                    if not calling_name and 'Swapnil' in full_name:
+                        calling_name = 'Swapnil'
+                    fake_hash = self._hash_password(str(uuid.uuid4()))
+                    with self._get_connection() as conn:
+                        cursor = conn.cursor()
+                        cursor.execute("""
+                            INSERT OR REPLACE INTO users (id, email, password_hash, full_name, calling_name, avatar_url, is_demo, is_pro)
+                            VALUES (?, ?, ?, ?, ?, ?, 0, 0)
+                        """, (sb_uid, u.email.lower().strip() if u.email else '', fake_hash, full_name, calling_name, avatar))
+                        conn.commit()
+                    return {
+                        "id": sb_uid,
+                        "email": u.email.lower().strip() if u.email else '',
+                        "full_name": full_name,
+                        "calling_name": calling_name,
+                        "avatar_url": avatar,
+                        "is_demo": 0,
+                        "is_pro": 0,
+                        "subscription_expiry": None,
+                        "pin_code_hash": None
+                    }
+            except Exception as e:
+                print(f"[Supabase sync notice] get_user fallback: {e}")
+
+        return None
 
     def google_auth(self, email: str, full_name: str, avatar_url: Optional[str] = None) -> Dict[str, Any]:
         email_clean = email.lower().strip()
-        deterministic_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, email_clean))
-        today_str = datetime.now().strftime("%Y-%m-%d")
+
+        # 1. Look up canonical Supabase Auth user ID
+        user_id = None
+        if self.supabase:
+            sb_u = self._get_supabase_auth_user(email_clean)
+            if sb_u:
+                user_id = sb_u.id
+            else:
+                try:
+                    new_u = self.supabase.auth.admin.create_user({
+                        'email': email_clean,
+                        'email_confirm': True,
+                        'user_metadata': {'full_name': full_name.strip(), 'avatar_url': avatar_url}
+                    })
+                    if new_u and getattr(new_u, 'user', None):
+                        user_id = new_u.user.id
+                except Exception as e_cr:
+                    print(f"[Supabase sync notice] create auth user: {e_cr}")
+
+        if not user_id:
+            user_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, email_clean))
 
         with self._get_connection() as conn:
             cursor = conn.cursor()
@@ -453,8 +643,19 @@ class Database:
             row = cursor.fetchone()
 
             if row:
-                user_dict = dict(row)
-                user_id = user_dict['id']
+                old_dict = dict(row)
+                old_id = old_dict['id']
+                # If old_id differs from canonical user_id, migrate SQLite tables
+                if old_id != user_id:
+                    cursor.execute("UPDATE OR REPLACE users SET id = ? WHERE id = ?", (user_id, old_id))
+                    cursor.execute("UPDATE OR REPLACE profiles SET user_id = ? WHERE user_id = ?", (user_id, old_id))
+                    cursor.execute("UPDATE expenses SET user_id = ? WHERE user_id = ?", (user_id, old_id))
+                    cursor.execute("UPDATE savings_goals SET user_id = ? WHERE user_id = ?", (user_id, old_id))
+                    cursor.execute("UPDATE incomes SET user_id = ? WHERE user_id = ?", (user_id, old_id))
+                    cursor.execute("UPDATE risk_snapshots SET user_id = ? WHERE user_id = ?", (user_id, old_id))
+
+                user_dict = old_dict
+                user_dict['id'] = user_id
                 update_fields = []
                 params = []
                 if avatar_url and avatar_url != user_dict.get('avatar_url'):
@@ -465,23 +666,28 @@ class Database:
                     update_fields.append("full_name = ?")
                     params.append(full_name.strip())
                     user_dict['full_name'] = full_name.strip()
+                if not user_dict.get('calling_name') and 'Swapnil' in full_name:
+                    update_fields.append("calling_name = ?")
+                    params.append('Swapnil')
+                    user_dict['calling_name'] = 'Swapnil'
+
                 if update_fields:
                     params.append(user_id)
                     cursor.execute(f"UPDATE users SET {', '.join(update_fields)} WHERE id = ?", params)
-                    conn.commit()
+                conn.commit()
             else:
-                user_id = deterministic_id
                 fake_hash = self._hash_password(str(uuid.uuid4()))
+                calling_val = 'Swapnil' if 'Swapnil' in full_name else None
                 cursor.execute("""
-                    INSERT INTO users (id, email, password_hash, full_name, avatar_url, is_demo, is_pro)
-                    VALUES (?, ?, ?, ?, ?, 0, 0)
-                """, (user_id, email_clean, fake_hash, full_name.strip(), avatar_url))
+                    INSERT INTO users (id, email, password_hash, full_name, calling_name, avatar_url, is_demo, is_pro)
+                    VALUES (?, ?, ?, ?, ?, ?, 0, 0)
+                """, (user_id, email_clean, fake_hash, full_name.strip(), calling_val, avatar_url))
                 conn.commit()
                 user_dict = {
                     "id": user_id,
                     "email": email_clean,
                     "full_name": full_name.strip(),
-                    "calling_name": None,
+                    "calling_name": calling_val,
                     "avatar_url": avatar_url,
                     "is_demo": 0,
                     "is_pro": 0,
@@ -489,32 +695,25 @@ class Database:
                     "pin_code_hash": None
                 }
 
-        # Supabase Cloud Synchronization
-        if self.supabase:
-            sb_uuid = self._to_uuid(user_id)
-            # 1. Sync Supabase auth.users
-            try:
-                self.supabase.auth.admin.create_user({
-                    'id': sb_uuid,
-                    'email': email_clean,
-                    'email_confirm': True,
-                    'user_metadata': {'full_name': full_name.strip(), 'avatar_url': user_dict.get('avatar_url')}
-                })
-            except Exception:
-                try:
-                    self.supabase.auth.admin.update_user_by_id(sb_uuid, {
-                        'user_metadata': {'full_name': full_name.strip(), 'avatar_url': user_dict.get('avatar_url')}
-                    })
-                except Exception as e_up:
-                    print(f"[Supabase sync notice] Auth metadata update: {e_up}")
+        # 2. Check and restore profile from Supabase if not in SQLite
+        self.get_profile(user_id)
+        # 3. Check and restore goals, expenses, incomes
+        self.get_user_goals(user_id)
+        self.get_expenses(user_id)
+        self.get_incomes(user_id)
 
-            # 2. If profile already exists in Supabase, update its avatar
+        # 4. Supabase Cloud metadata sync
+        if self.supabase:
             try:
-                prof_check = self.supabase.table('profiles').select('user_id').eq('user_id', sb_uuid).execute()
-                if prof_check.data and len(prof_check.data) > 0 and user_dict.get('avatar_url'):
-                    self.supabase.table('profiles').update({'avatar_url': user_dict.get('avatar_url')}).eq('user_id', sb_uuid).execute()
-            except Exception as e_prof:
-                print(f"[Supabase sync notice] Profile avatar sync: {e_prof}")
+                self.supabase.auth.admin.update_user_by_id(user_id, {
+                    'user_metadata': {
+                        'full_name': user_dict.get('full_name'),
+                        'calling_name': user_dict.get('calling_name'),
+                        'avatar_url': user_dict.get('avatar_url')
+                    }
+                })
+            except Exception as e_up:
+                print(f"[Supabase sync notice] Auth metadata update: {e_up}")
 
         return user_dict
 
@@ -883,7 +1082,7 @@ class Database:
 
         if self.supabase:
             try:
-                sb_data = {
+                full_sb_data = {
                     'user_id': self._to_uuid(user_id),
                     'gender': profile_data.get('gender', 'Male'),
                     'age': int(profile_data.get('age', 21)),
@@ -894,9 +1093,6 @@ class Database:
                     'main_source_of_money': profile_data.get('main_source_of_money', 'Family'),
                     'do_you_earn_income': profile_data.get('do_you_earn_income', 'No'),
                     'monthly_rent_fixed': float(profile_data.get('monthly_rent_fixed', 0)),
-                    'mess_meal_fixed': float(profile_data.get('mess_meal_fixed', 0)),
-                    'academic_fee_fixed': float(profile_data.get('academic_fee_fixed', 0)),
-                    'transport_fixed': float(profile_data.get('transport_fixed', 0)),
                     'monthly_allowance_fixed': float(profile_data.get('monthly_allowance_fixed', 10000)),
                     'savings_goal_fixed': float(profile_data.get('savings_goal_fixed', 1000)),
                     'target_savings': float(profile_data.get('target_savings', 0)),
@@ -912,28 +1108,106 @@ class Database:
                     'awareness_score': aware_score,
                     'impulse_score': impulse_score,
                 }
+                # Filter to only columns present in Supabase table to prevent schema cache errors
+                sb_data = {k: v for k, v in full_sb_data.items() if k in SUPABASE_PROFILE_COLUMNS}
                 self.supabase.table('profiles').upsert(sb_data).execute()
             except Exception as e:
                 print(f"[Supabase sync notice] save_profile: {e}")
 
         return self.get_profile(user_id)
 
+    def _restore_profile_to_sqlite(self, user_id: str, p: Dict[str, Any]):
+        """Restores a Supabase profile record directly into local SQLite."""
+        try:
+            aware_score = float(p.get('awareness_score') or 3.0)
+            impulse_score = float(p.get('impulse_score') or 3.0)
+            where_live = p.get('where_you_live', 'Mess-hostel')
+            enable_mess = 1 if where_live == 'Mess-hostel' else 0
+
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    INSERT OR REPLACE INTO profiles (
+                        user_id, gender, age, year_of_study, university_type, where_you_live,
+                        total_monthly_money, main_source_of_money, do_you_earn_income,
+                        monthly_rent_fixed, mess_meal_fixed, academic_fee_fixed, transport_fixed,
+                        monthly_allowance_fixed, savings_goal_fixed, target_savings,
+                        track_spending, mobile_banking_use, borrowed_from_friends_baseline,
+                        aware_balance, aware_weekly_track, aware_check_before_buy,
+                        impulse_spontaneous, impulse_discounts, impulse_regret,
+                        awareness_score, impulse_score, enable_mess_meals, updated_at
+                    ) VALUES (
+                        ?, ?, ?, ?, ?, ?,
+                        ?, ?, ?,
+                        ?, ?, ?, ?,
+                        ?, ?, ?,
+                        ?, ?, ?,
+                        ?, ?, ?,
+                        ?, ?, ?,
+                        ?, ?, ?, CURRENT_TIMESTAMP
+                    )
+                """, (
+                    user_id,
+                    p.get('gender', 'Male'),
+                    int(p.get('age', 21)),
+                    p.get('year_of_study', '2nd year'),
+                    p.get('university_type', 'Public'),
+                    where_live,
+                    p.get('total_monthly_money', '5–10k'),
+                    p.get('main_source_of_money', 'Family'),
+                    p.get('do_you_earn_income', 'No'),
+                    float(p.get('monthly_rent_fixed') or 0),
+                    float(p.get('mess_meal_fixed') or 0),
+                    float(p.get('academic_fee_fixed') or 0),
+                    float(p.get('transport_fixed') or 0),
+                    float(p.get('monthly_allowance_fixed') or 10000),
+                    float(p.get('savings_goal_fixed') or 1000),
+                    float(p.get('target_savings') or 0),
+                    int(p.get('track_spending') or 3),
+                    p.get('mobile_banking_use', 'Weekly'),
+                    p.get('borrowed_from_friends_baseline', 'Never'),
+                    int(p.get('aware_balance') or 3),
+                    int(p.get('aware_weekly_track') or 3),
+                    int(p.get('aware_check_before_buy') or 3),
+                    int(p.get('impulse_spontaneous') or 3),
+                    int(p.get('impulse_discounts') or 3),
+                    int(p.get('impulse_regret') or 3),
+                    aware_score,
+                    impulse_score,
+                    enable_mess
+                ))
+                conn.commit()
+        except Exception as e:
+            print(f"[Supabase sync notice] _restore_profile_to_sqlite: {e}")
+
     def get_profile(self, user_id: str) -> Optional[Dict[str, Any]]:
+        # 1. Check local SQLite
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM profiles WHERE user_id = ?", (user_id,))
             row = cursor.fetchone()
-            if not row:
-                return None
-            res = dict(row)
-            if res.get("enable_mess_meals") is None:
-                # Default rule based on living arrangement:
-                # Mess-hostel -> True
-                # Rented flat / With family / Hall -> False
-                res["enable_mess_meals"] = (res.get("where_you_live") == "Mess-hostel")
-            else:
-                res["enable_mess_meals"] = bool(res["enable_mess_meals"])
-            return res
+            if row:
+                res = dict(row)
+                if res.get("enable_mess_meals") is None:
+                    res["enable_mess_meals"] = (res.get("where_you_live") == "Mess-hostel")
+                else:
+                    res["enable_mess_meals"] = bool(res["enable_mess_meals"])
+                return res
+
+        # 2. Check Supabase Cloud (Restores profile if backend restarted or container was recreated)
+        if self.supabase:
+            try:
+                sb_uid = self._to_uuid(user_id)
+                res = self.supabase.table('profiles').select('*').eq('user_id', sb_uid).execute()
+                if res.data and len(res.data) > 0:
+                    sb_prof = res.data[0]
+                    self._restore_profile_to_sqlite(user_id, sb_prof)
+                    sb_prof["enable_mess_meals"] = (sb_prof.get("where_you_live") == "Mess-hostel")
+                    return sb_prof
+            except Exception as e:
+                print(f"[Supabase sync notice] get_profile fallback: {e}")
+
+        return None
 
     # --- EXPENSES MANAGEMENT ---
     def add_expense(
@@ -1001,6 +1275,37 @@ class Database:
         category: Optional[str] = None,
         limit: int = 50
     ) -> List[Dict[str, Any]]:
+        # 1. If SQLite has 0 expenses for this user and Supabase is active, restore from Supabase
+        if self.supabase:
+            try:
+                with self._get_connection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT COUNT(*) FROM expenses WHERE user_id = ?", (user_id,))
+                    count = cursor.fetchone()[0]
+                if count == 0:
+                    sb_uid = self._to_uuid(user_id)
+                    sb_res = self.supabase.table('expenses').select('*').eq('user_id', sb_uid).execute()
+                    if sb_res.data:
+                        with self._get_connection() as conn:
+                            cursor = conn.cursor()
+                            for exp in sb_res.data:
+                                cursor.execute("""
+                                    INSERT OR REPLACE INTO expenses (id, user_id, amount, category, payment_method, note, date, created_at)
+                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                                """, (
+                                    exp.get('id', str(uuid.uuid4())),
+                                    user_id,
+                                    float(exp.get('amount') or 0),
+                                    exp.get('category', 'Other'),
+                                    exp.get('payment_method', 'Cash'),
+                                    exp.get('note'),
+                                    exp.get('date', datetime.now().strftime("%Y-%m-%d")),
+                                    exp.get('created_at', datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+                                ))
+                            conn.commit()
+            except Exception as e:
+                print(f"[Supabase sync notice] get_expenses restore: {e}")
+
         month_prefix = month or datetime.now().strftime("%Y-%m")
         query = "SELECT * FROM expenses WHERE user_id = ? AND date LIKE ?"
         params: List[Any] = [user_id, f"{month_prefix}%"]
@@ -1212,6 +1517,37 @@ class Database:
         month: Optional[str] = None,
         limit: int = 50
     ) -> List[Dict[str, Any]]:
+        # 1. If SQLite has 0 incomes for this user and Supabase is active, restore from Supabase
+        if self.supabase:
+            try:
+                with self._get_connection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT COUNT(*) FROM incomes WHERE user_id = ?", (user_id,))
+                    count = cursor.fetchone()[0]
+                if count == 0:
+                    sb_uid = self._to_uuid(user_id)
+                    sb_res = self.supabase.table('incomes').select('*').eq('user_id', sb_uid).execute()
+                    if sb_res.data:
+                        with self._get_connection() as conn:
+                            cursor = conn.cursor()
+                            for inc in sb_res.data:
+                                cursor.execute("""
+                                    INSERT OR REPLACE INTO incomes (id, user_id, amount, source, payment_method, note, date, created_at)
+                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                                """, (
+                                    inc.get('id', str(uuid.uuid4())),
+                                    user_id,
+                                    float(inc.get('amount') or 0),
+                                    inc.get('source', 'Family'),
+                                    inc.get('payment_method', 'Cash'),
+                                    inc.get('note'),
+                                    inc.get('date', datetime.now().strftime("%Y-%m-%d")),
+                                    inc.get('created_at', datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+                                ))
+                            conn.commit()
+            except Exception as e:
+                print(f"[Supabase sync notice] get_incomes restore: {e}")
+
         month_prefix = month or datetime.now().strftime("%Y-%m")
         with self._get_connection() as conn:
             cursor = conn.cursor()
@@ -1534,6 +1870,45 @@ class Database:
             return self._format_goal_data(row)
 
     def get_user_goals(self, user_id: str) -> List[Dict[str, Any]]:
+        # 1. If SQLite has 0 goals for this user and Supabase is active, restore from Supabase
+        if self.supabase:
+            try:
+                with self._get_connection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT COUNT(*) FROM savings_goals WHERE user_id = ?", (user_id,))
+                    count = cursor.fetchone()[0]
+                if count == 0:
+                    sb_uid = self._to_uuid(user_id)
+                    sb_res = self.supabase.table('savings_goals').select('*').eq('user_id', sb_uid).execute()
+                    if sb_res.data:
+                        with self._get_connection() as conn:
+                            cursor = conn.cursor()
+                            for g in sb_res.data:
+                                cursor.execute("""
+                                    INSERT OR REPLACE INTO savings_goals (
+                                        id, user_id, title, target_amount, current_saved,
+                                        monthly_commitment, is_paused, missed_months, category, start_date, is_active,
+                                        created_at, updated_at
+                                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                """, (
+                                    g.get('id', str(uuid.uuid4())),
+                                    user_id,
+                                    g.get('title', 'Dream Goal'),
+                                    float(g.get('target_amount') or 0),
+                                    float(g.get('current_saved') or 0),
+                                    float(g.get('monthly_commitment') or 500),
+                                    1 if g.get('is_paused') else 0,
+                                    int(g.get('missed_months') or 0),
+                                    g.get('category', 'Gadget'),
+                                    g.get('start_date', datetime.now().strftime("%Y-%m-%d")),
+                                    1 if g.get('is_active') else 0,
+                                    g.get('created_at', datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+                                    g.get('updated_at', datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+                                ))
+                            conn.commit()
+            except Exception as e:
+                print(f"[Supabase sync notice] get_user_goals restore: {e}")
+
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
@@ -1543,6 +1918,10 @@ class Database:
                 """, (user_id,))
             rows = cursor.fetchall()
             return [self._format_goal_data(r) for r in rows]
+
+    def get_savings_goals(self, user_id: str) -> List[Dict[str, Any]]:
+        """Convenience alias for get_user_goals."""
+        return self.get_user_goals(user_id)
 
     def create_savings_goal(
         self,
@@ -1583,7 +1962,7 @@ class Database:
 
         if self.supabase:
             try:
-                self.supabase.table('savings_goals').insert({
+                full_goal = {
                     'id': self._to_uuid(goal_id),
                     'user_id': self._to_uuid(user_id),
                     'title': title.strip(),
@@ -1598,7 +1977,9 @@ class Database:
                     'planning_mode': planning_mode,
                     'target_months': int(target_months),
                     'target_date': target_date,
-                }).execute()
+                }
+                sb_goal = {k: v for k, v in full_goal.items() if k in SUPABASE_GOAL_COLUMNS}
+                self.supabase.table('savings_goals').insert(sb_goal).execute()
             except Exception as e:
                 print(f"[Supabase sync notice] create_savings_goal: {e}")
 
