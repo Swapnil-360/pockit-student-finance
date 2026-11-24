@@ -120,38 +120,127 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } catch {}
 
-    const isWeb = Platform.OS === 'web';
+    setGoogleLoading(true);
+    try {
+      const isWeb = Platform.OS === 'web';
+      const redirectUri = isWeb
+        ? (typeof window !== 'undefined' && window.location?.origin
+            ? window.location.origin
+            : Linking.createURL('/'))
+        : makeRedirectUri({
+            scheme: 'pockit',
+            path: 'auth/callback',
+          });
 
-    // On Web, standard browser redirect works 100% cleanly
-    if (isWeb) {
-      setGoogleLoading(true);
-      try {
-        const redirectUri = typeof window !== 'undefined' && window.location?.origin
-          ? window.location.origin
-          : Linking.createURL('/');
-        const { error } = await supabase.auth.signInWithOAuth({
-          provider: 'google',
-          options: {
-            redirectTo: redirectUri,
-            skipBrowserRedirect: false,
-          },
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: redirectUri,
+          skipBrowserRedirect: !isWeb,
+        },
+      });
+
+      if (error) throw error;
+
+      if (isWeb) return;
+
+      if (data?.url) {
+        const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUri, {
+          showInRecents: true,
         });
-        if (error) throw error;
-      } catch (err: any) {
-        Alert.alert('Google Sign-In', err.message || 'Could not initiate Google authentication.');
-      } finally {
-        setGoogleLoading(false);
-      }
-      return;
-    }
 
-    // On Mobile (Expo Go): Android Chrome blocks custom-scheme redirects (exp://...) in Chrome Custom Tabs.
-    // Pre-populate with student Google account for seamless 1-tap authentication:
-    if (!customGoogleEmail) {
-      setCustomGoogleEmail('miftahurr503@gmail.com');
-      setCustomGoogleName('Md. Miftahur Rahman Swapnil');
+        try {
+          WebBrowser.dismissAuthSession();
+        } catch {}
+
+        if (result.type === 'success' && result.url) {
+          const url = result.url;
+          let userEmail = '';
+          let userName = '';
+          let userAvatar = '';
+
+          if (url.includes('access_token=')) {
+            const hash = url.split('#')[1] || url.split('?')[1] || '';
+            const params: Record<string, string> = {};
+            hash.split('&').forEach((part) => {
+              const [k, v] = part.split('=');
+              if (k && v) params[k] = decodeURIComponent(v);
+            });
+
+            if (params.access_token && params.refresh_token) {
+              const { data: sessionData } = await supabase.auth.setSession({
+                access_token: params.access_token,
+                refresh_token: params.refresh_token,
+              });
+              if (sessionData?.session?.user) {
+                const u = sessionData.session.user;
+                userEmail = u.email || '';
+                userName =
+                  u.user_metadata?.full_name ||
+                  u.user_metadata?.name ||
+                  userEmail.split('@')[0];
+                userAvatar =
+                  u.user_metadata?.avatar_url ||
+                  u.user_metadata?.picture ||
+                  '';
+              }
+            }
+          } else if (url.includes('code=')) {
+            const codeMatch = url.match(/code=([^&]+)/);
+            if (codeMatch && codeMatch[1]) {
+              const { data: sessionData } = await supabase.auth.exchangeCodeForSession(
+                decodeURIComponent(codeMatch[1])
+              );
+              if (sessionData?.session?.user) {
+                const u = sessionData.session.user;
+                userEmail = u.email || '';
+                userName =
+                  u.user_metadata?.full_name ||
+                  u.user_metadata?.name ||
+                  userEmail.split('@')[0];
+                userAvatar =
+                  u.user_metadata?.avatar_url ||
+                  u.user_metadata?.picture ||
+                  '';
+              }
+            }
+          }
+
+          if (!userEmail) {
+            const { data: currentSession } = await supabase.auth.getSession();
+            if (currentSession?.session?.user) {
+              const u = currentSession.session.user;
+              userEmail = u.email || '';
+              userName =
+                u.user_metadata?.full_name ||
+                u.user_metadata?.name ||
+                userEmail.split('@')[0];
+              userAvatar =
+                u.user_metadata?.avatar_url ||
+                u.user_metadata?.picture ||
+                '';
+            }
+          }
+
+          if (userEmail) {
+            const authRes = await authGoogle(userEmail, userName, userAvatar);
+            onAuthSuccess(authRes);
+            return;
+          }
+        }
+      }
+    } catch (err: any) {
+      console.warn('Google Sign-In error:', err);
+      Alert.alert(
+        language === 'bn' ? 'গুগল সাইন-ইন' : 'Google Sign-In',
+        err.message ||
+          (language === 'bn'
+            ? 'গুগল সাইন-ইন সম্পন্ন করা যায়নি।'
+            : 'Could not complete Google Sign-In.')
+      );
+    } finally {
+      setGoogleLoading(false);
     }
-    setGooglePickerVisible(true);
   };
 
   const handleOpenBrowserOAuth = async () => {
@@ -323,6 +412,23 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               </Text>
             </View>
           )}
+        </TouchableOpacity>
+
+        {/* Subtle emulator/offline fallback option */}
+        <TouchableOpacity
+          style={styles.manualFallbackBtn}
+          onPress={() => {
+            if (!customGoogleEmail) {
+              setCustomGoogleEmail('miftahurr503@gmail.com');
+              setCustomGoogleName('Md. Miftahur Rahman Swapnil');
+            }
+            setGooglePickerVisible(true);
+          }}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.manualFallbackText, { color: theme.textMuted }]}>
+            {language === 'bn' ? 'ব্রাউজার ছাড়া ম্যানুয়াল লগইন?' : 'Trouble with browser? Manual login'}
+          </Text>
         </TouchableOpacity>
 
         <View style={styles.dividerRow}>
@@ -661,6 +767,16 @@ const styles = StyleSheet.create({
   googleBtnText: {
     fontSize: 15,
     fontWeight: '700',
+  },
+  manualFallbackBtn: {
+    alignItems: 'center',
+    marginTop: -8,
+    marginBottom: 8,
+    paddingVertical: 4,
+  },
+  manualFallbackText: {
+    fontSize: 11.5,
+    textDecorationLine: 'underline',
   },
   dividerRow: {
     flexDirection: 'row',
