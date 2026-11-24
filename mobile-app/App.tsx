@@ -548,6 +548,30 @@ function AppContent() {
               )}
             </TouchableOpacity>
 
+            {/* Center Slot: Prominent Floating Terracotta '+' Quick Transaction Button (Requirement 6) */}
+            <View style={styles.floatingPlusBtnWrap}>
+              <TouchableOpacity
+                style={[
+                  styles.floatingPlusBtn,
+                  {
+                    backgroundColor: theme.primary,
+                    borderColor: theme.surface,
+                  },
+                ]}
+                onPress={() => {
+                  try {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  } catch {}
+                  setQuickModalVisible(true);
+                }}
+                activeOpacity={0.85}
+                accessibilityRole="button"
+                accessibilityLabel="Quick Add Transaction"
+              >
+                <Ionicons name="add" size={28} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+
             {/* Tab 3: Dream Goals */}
             <TouchableOpacity
               style={styles.tabItem}
@@ -601,20 +625,6 @@ function AppContent() {
               {activeTab === 'coach' && (
                 <View style={[styles.activeDot, { backgroundColor: theme.primary }]} />
               )}
-            </TouchableOpacity>
-
-            {/* Prominent Floating Terracotta '+' Quick Transaction Button */}
-            <TouchableOpacity
-              style={[styles.floatingPlusBtn, { backgroundColor: theme.primary }]}
-              onPress={() => {
-                try {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                } catch {}
-                setQuickModalVisible(true);
-              }}
-              activeOpacity={0.85}
-            >
-              <Ionicons name="add" size={26} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
         </View>
@@ -690,9 +700,8 @@ const styles = StyleSheet.create({
   tabBarInner: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'space-around',
     height: 64,
-    paddingRight: 6,
   },
   tabItem: {
     flex: 1,
@@ -701,6 +710,12 @@ const styles = StyleSheet.create({
     height: 52,
     position: 'relative',
     paddingHorizontal: 1,
+  },
+  floatingPlusBtnWrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 64,
   },
   tabLabel: {
     fontSize: 9.5,
@@ -729,16 +744,17 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   floatingPlusBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 4,
+    marginTop: -16,
     shadowColor: '#F27A49',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.38,
+    shadowRadius: 10,
+    elevation: 8,
+    borderWidth: 3,
   },
 });

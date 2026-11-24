@@ -19,6 +19,7 @@ import { SavingsGoalCard } from '../components/SavingsGoalCard';
 import { CreateGoalModal } from '../components/CreateGoalModal';
 import { BoostGoalModal } from '../components/BoostGoalModal';
 import { LeftoverSweepModal } from '../components/LeftoverSweepModal';
+import { getGoalIconName } from '../constants/goalIcons';
 
 interface GoalsScreenProps {
   userId: string;
@@ -279,14 +280,7 @@ export const GoalsScreen: React.FC<GoalsScreenProps> = ({
 
             {goals.slice(1).map((g) => {
               const gPct = Math.min(100, Math.max(0, g.progress_pct || 0));
-              const categoryIcon =
-                g.category?.toLowerCase().includes('gadget') || g.title.toLowerCase().includes('monitor')
-                  ? 'laptop-outline'
-                  : g.category?.toLowerCase().includes('travel') || g.title.toLowerCase().includes('trip')
-                  ? 'airplane-outline'
-                  : g.category?.toLowerCase().includes('education') || g.title.toLowerCase().includes('course')
-                  ? 'school-outline'
-                  : 'sparkles-outline';
+              const categoryIcon = getGoalIconName(g.title, g.category);
 
               return (
                 <View

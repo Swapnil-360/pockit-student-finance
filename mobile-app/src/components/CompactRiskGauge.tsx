@@ -64,23 +64,23 @@ export const CompactRiskGauge: React.FC<CompactRiskGaugeProps> = ({
       return {
         text: theme.riskLow,
         bg: isDark ? 'rgba(16, 185, 129, 0.16)' : '#E6F9F0',
-        border: theme.riskLow,
-        label: language === 'bn' ? tierBn || 'কম ঝুঁকি' : 'LOW RISK',
+        border: isDark ? 'rgba(16, 185, 129, 0.3)' : '#A7F3D0',
+        label: language === 'bn' ? tierBn || 'কম ঝুঁকি' : 'Low Risk',
       };
     }
     if (score < 70) {
       return {
         text: theme.riskModerate,
         bg: isDark ? 'rgba(245, 158, 11, 0.16)' : '#FEF3C7',
-        border: theme.riskModerate,
-        label: language === 'bn' ? tierBn || 'মাঝারি' : 'MODERATE',
+        border: isDark ? 'rgba(245, 158, 11, 0.3)' : '#FDE68A',
+        label: language === 'bn' ? tierBn || 'মাঝারি ঝুঁকি' : 'Moderate Risk',
       };
     }
     return {
       text: theme.primary,
       bg: theme.terracottaSoft,
-      border: theme.primary,
-      label: language === 'bn' ? tierBn || 'উচ্চ ঝুঁকি' : 'HIGH RISK',
+      border: isDark ? 'rgba(239, 68, 68, 0.3)' : '#FECACA',
+      label: language === 'bn' ? tierBn || 'উচ্চ ঝুঁকি' : 'High Risk',
     };
   };
 
@@ -130,18 +130,15 @@ export const CompactRiskGauge: React.FC<CompactRiskGaugeProps> = ({
           )}
         </Svg>
 
-        {/* Center Readout Plate */}
+        {/* Center Readout Plate: Single clean percentage matching Image 1 */}
         <View style={styles.centerPlate}>
           <Text style={[styles.percentageText, { color: theme.textPrimary }]}>
-            {displayScore.toFixed(1)}%
-          </Text>
-          <Text style={[styles.microLabel, { color: theme.textMuted }]}>
-            {language === 'bn' ? 'ঝুঁকি' : 'RISK'}
+            {Math.round(displayScore)}%
           </Text>
         </View>
       </View>
 
-      {/* Underneath Risk Tier Badge */}
+      {/* Underneath Risk Tier Badge (Clean Title Case pill, exactly 1 badge) */}
       <View
         style={[
           styles.tierPill,
@@ -198,30 +195,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   percentageText: {
-    fontSize: 20,
-    fontWeight: '800',
+    fontSize: 22,
+    fontWeight: '700',
     fontVariant: ['tabular-nums'],
     letterSpacing: -0.5,
   },
-  microLabel: {
-    fontSize: 9,
-    fontWeight: '700',
-    letterSpacing: 0.8,
-    marginTop: -1,
-  },
   tierPill: {
-    paddingHorizontal: 8,
+    paddingHorizontal: 10,
     paddingVertical: 3,
-    borderRadius: 9,
+    borderRadius: 12,
     borderWidth: 1,
     marginTop: 6,
     alignItems: 'center',
   },
   tierText: {
-    fontSize: 9.5,
-    fontWeight: '800',
-    letterSpacing: 0.3,
-    textTransform: 'uppercase',
+    fontSize: 10.5,
+    fontWeight: '600',
+    letterSpacing: 0.1,
   },
 });
 

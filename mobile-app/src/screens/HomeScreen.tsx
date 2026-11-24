@@ -10,7 +10,7 @@ import {
   StatusBar,
   Image,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../constants/ThemeContext';
@@ -33,6 +33,7 @@ import { MessMealTrackerModal } from '../components/MessMealTrackerModal';
 import { sendHighRiskAlertNotification } from '../services/notifications';
 import { getRandomQuote, getNextQuote, MotivationalQuote } from '../constants/quotes';
 import { getCallingName } from '../utils/nameHelper';
+import { getGoalIconName } from '../constants/goalIcons';
 
 interface HomeScreenProps {
   user: UserData;
@@ -401,33 +402,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   tier={current_risk.risk_tier}
                   tierBn={current_risk.risk_tier_bn}
                   language={language}
-                  size={84}
+                  size={80}
                   strokeWidth={8}
                   onPress={() => setRiskDetailsVisible(true)}
                 />
               </View>
-
-              <Text
-                style={[
-                  styles.riskTierBottomText,
-                  {
-                    color: current_risk.risk_score_pct >= 70
-                      ? '#EF4444'
-                      : current_risk.risk_score_pct >= 40
-                      ? '#F59E0B'
-                      : '#10B981',
-                  },
-                ]}
-              >
-                {language === 'bn'
-                  ? current_risk.risk_tier_bn
-                  : `${current_risk.risk_tier.charAt(0).toUpperCase() + current_risk.risk_tier.slice(1)} Risk`}
-              </Text>
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* 4. 3-Stat Cards Row (Rent & Mess, Savings, Left for the Month - Requirement 2) */}
+        {/* 4. 3-Stat Cards Row (Rent & Mess, Savings, Left for Month - Matching Image 1) */}
         <View style={styles.threeStatRow}>
           {/* Card 1: Rent & Mess */}
           <TouchableOpacity
@@ -449,14 +433,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               <Ionicons name="home" size={18} color="#0284C7" />
             </View>
             <Text style={[styles.statCardLabel, { color: theme.textSecondary }]} numberOfLines={1}>
-              {dashboard.enable_mess_meals !== false ? 'Rent & Mess' : 'Housing & Fixed'}
+              {dashboard.enable_mess_meals !== false ? 'Rent & Mess' : 'Housing'}
             </Text>
             <Text style={[styles.statCardVal, { color: isDark ? '#F8FAFC' : '#0F172A' }]} numberOfLines={1}>
               ৳{Math.round(dashboard.fixed_obligations_spent !== undefined ? dashboard.fixed_obligations_spent : (dashboard.category_breakdown?.['Rent'] || 7000)).toLocaleString()}
             </Text>
           </TouchableOpacity>
 
-          {/* Card 2: Savings */}
+          {/* Card 2: Savings (Piggy bank icon in soft green circle) */}
           <TouchableOpacity
             style={[
               styles.statCardItem,
@@ -473,7 +457,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             activeOpacity={0.8}
           >
             <View style={[styles.statIconCircle, { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.18)' : '#DCFCE7' }]}>
-              <Ionicons name="sparkles" size={17} color="#16A34A" />
+              <MaterialCommunityIcons name="piggy-bank" size={20} color="#16A34A" />
             </View>
             <Text style={[styles.statCardLabel, { color: theme.textSecondary }]} numberOfLines={1}>
               {language === 'bn' ? 'সঞ্চয়' : 'Savings'}
@@ -483,7 +467,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </Text>
           </TouchableOpacity>
 
-          {/* Card 3: Left for the Month (Requirement 2!) */}
+          {/* Card 3: Left for Month (Wallet icon in soft orange circle, no truncation) */}
           <View
             style={[
               styles.statCardItem,
@@ -497,8 +481,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             <View style={[styles.statIconCircle, { backgroundColor: isDark ? 'rgba(234, 88, 12, 0.18)' : '#FFEDD5' }]}>
               <Ionicons name="wallet" size={18} color="#EA580C" />
             </View>
-            <Text style={[styles.statCardLabel, { color: theme.textSecondary }]} numberOfLines={1}>
-              {language === 'bn' ? 'মাসের বাকি' : 'Left for the Month'}
+            <Text
+              style={[styles.statCardLabel, { color: theme.textSecondary }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.85}
+            >
+              {language === 'bn' ? 'মাসের বাকি' : 'Left for Month'}
             </Text>
             <Text
               style={[
@@ -554,8 +543,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
           {activeGoal ? (
             <View style={styles.dreamGoalBody}>
-              <View style={[styles.goalThumbBox, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : '#F8FAFC' }]}>
-                <Ionicons name="desktop-outline" size={28} color="#EA580C" />
+              <View style={[styles.goalThumbBox, { backgroundColor: isDark ? 'rgba(234, 88, 12, 0.15)' : '#FFEDD5' }]}>
+                <Ionicons
+                  name={getGoalIconName(activeGoal.title, activeGoal.category)}
+                  size={26}
+                  color="#EA580C"
+                />
               </View>
 
               <View style={styles.goalInfoCol}>
@@ -609,7 +602,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           )}
         </View>
 
-        {/* 6. Weekly Streak Card (Image 1 Style - Responsive & Overflow Protected) */}
+        {/* 6. Weekly Streak Card (Image 1 Style - Celebratory Sparkle & Perfectly Spaced Day Nodes) */}
         <View
           style={[
             styles.weeklyStreakCard,
@@ -619,6 +612,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             },
           ]}
         >
+          {/* Top-Right Celebration Sparkles Accent from Image 1 */}
+          <View style={styles.streakSparkleBurst}>
+            <Ionicons name="sparkles" size={13} color="#EA580C" />
+          </View>
+
           <View style={styles.streakLeftWrap}>
             <View style={styles.flameIconWrap}>
               <Ionicons name="flame" size={20} color="#EA580C" />
@@ -627,7 +625,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               <Text style={[styles.streakTitle, { color: isDark ? '#F8FAFC' : '#0F172A' }]} numberOfLines={1}>
                 {language === 'bn' ? 'সাপ্তাহিক স্ট্রিক' : 'Weekly Streak'}
               </Text>
-              <Text style={[styles.streakCount, { color: isDark ? '#E2E8F0' : '#334155' }]} numberOfLines={1}>
+              <Text style={[styles.streakCount, { color: isDark ? '#CBD5E1' : '#334155' }]} numberOfLines={1}>
                 {dashboard.on_track_streak || 1} {language === 'bn' ? 'দিন একটানা' : 'days in a row'}
               </Text>
               <Text style={[styles.streakSub, { color: isDark ? '#94A3B8' : '#64748B' }]} numberOfLines={1}>
@@ -652,7 +650,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       },
                     ]}
                   >
-                    {isChecked && <Ionicons name="checkmark" size={9} color="#FFFFFF" />}
+                    {isChecked && <Ionicons name="checkmark" size={10} color="#FFFFFF" />}
                   </View>
                   <Text style={[styles.streakDayLabel, { color: isDark ? '#94A3B8' : '#64748B' }]}>
                     {day}
@@ -809,13 +807,13 @@ const styles = StyleSheet.create({
   },
   greetingMainText: {
     fontSize: 22,
-    fontWeight: '800',
-    letterSpacing: -0.4,
-    marginBottom: 3,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+    marginBottom: 2,
   },
   greetingSubText: {
     fontSize: 13,
-    fontWeight: '500',
+    fontWeight: '400',
   },
   heroCard: {
     borderRadius: 22,
@@ -832,8 +830,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   heroLeftCol: {
-    flex: 1.15,
-    paddingRight: 10,
+    flex: 1.25,
+    paddingRight: 8,
   },
   heroLabelRow: {
     flexDirection: 'row',
@@ -849,8 +847,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   heroColumnLabel: {
-    fontSize: 11,
-    fontWeight: '600',
+    fontSize: 11.5,
+    fontWeight: '500',
   },
   heroAmountRow: {
     flexDirection: 'row',
@@ -863,13 +861,13 @@ const styles = StyleSheet.create({
     marginRight: 2,
   },
   heroAmountNum: {
-    fontSize: 26,
-    fontWeight: '800',
+    fontSize: 28,
+    fontWeight: '700',
     letterSpacing: -0.5,
   },
   heroPerDay: {
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 12.5,
+    fontWeight: '400',
     marginLeft: 4,
   },
   onTrackPill: {
@@ -883,11 +881,11 @@ const styles = StyleSheet.create({
   },
   onTrackPillText: {
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: '600',
   },
   heroVerticalLine: {
     width: 1,
-    height: 90,
+    height: 86,
     marginHorizontal: 8,
   },
   heroRightCol: {
@@ -898,22 +896,19 @@ const styles = StyleSheet.create({
   riskGaugeWrap: {
     marginVertical: 4,
   },
-  riskTierBottomText: {
-    fontSize: 11,
-    fontWeight: '700',
-    marginTop: 2,
-  },
   threeStatRow: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 8,
     marginBottom: 14,
   },
   statCardItem: {
     flex: 1,
-    borderRadius: 18,
+    borderRadius: 16,
     borderWidth: 1,
-    padding: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 4,
     alignItems: 'center',
+    justifyContent: 'center',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 8,
@@ -925,17 +920,17 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   statCardLabel: {
     fontSize: 11,
-    fontWeight: '600',
-    marginBottom: 3,
+    fontWeight: '500',
+    marginBottom: 2,
     textAlign: 'center',
   },
   statCardVal: {
-    fontSize: 14,
-    fontWeight: '800',
+    fontSize: 15,
+    fontWeight: '700',
     textAlign: 'center',
   },
   dreamGoalCard: {
@@ -976,7 +971,7 @@ const styles = StyleSheet.create({
   },
   viewAllText: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '500',
   },
   dreamGoalBody: {
     flexDirection: 'row',
@@ -984,8 +979,8 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   goalThumbBox: {
-    width: 54,
-    height: 54,
+    width: 52,
+    height: 52,
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
@@ -994,13 +989,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   goalItemTitle: {
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: 14.5,
+    fontWeight: '600',
     marginBottom: 2,
   },
   goalItemAmount: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '400',
     marginBottom: 6,
   },
   goalProgressRow: {
@@ -1020,16 +1015,16 @@ const styles = StyleSheet.create({
   },
   goalItemPct: {
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: '600',
   },
   homeBoostBtn: {
     paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 14,
+    paddingVertical: 7,
+    borderRadius: 12,
   },
   homeBoostBtnText: {
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '600',
   },
   noGoalBody: {
     paddingVertical: 10,
@@ -1045,23 +1040,29 @@ const styles = StyleSheet.create({
   },
   setGoalOutlineBtnText: {
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '600',
   },
   weeklyStreakCard: {
     borderRadius: 22,
     borderWidth: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
     marginBottom: 14,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    position: 'relative',
+  },
+  streakSparkleBurst: {
+    position: 'absolute',
+    top: 8,
+    right: 10,
   },
   streakLeftWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
-    marginRight: 8,
+    flexShrink: 1,
+    marginRight: 4,
   },
   flameIconWrap: {
     width: 36,
@@ -1074,42 +1075,41 @@ const styles = StyleSheet.create({
   },
   streakTextCol: {
     marginLeft: 8,
-    flex: 1,
   },
   streakTitle: {
     fontSize: 13,
     fontWeight: '700',
   },
   streakCount: {
-    fontSize: 11,
-    fontWeight: '700',
+    fontSize: 11.5,
+    fontWeight: '500',
     marginTop: 1,
   },
   streakSub: {
-    fontSize: 10,
-    fontWeight: '500',
+    fontSize: 10.5,
+    fontWeight: '400',
   },
   streakDaysRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 5,
     flexShrink: 0,
   },
   streakDayNode: {
     alignItems: 'center',
-    width: 17,
+    width: 18,
   },
   streakDayDot: {
-    width: 17,
-    height: 17,
-    borderRadius: 8.5,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 2,
   },
   streakDayLabel: {
-    fontSize: 9,
-    fontWeight: '600',
+    fontSize: 9.5,
+    fontWeight: '500',
   },
   smartTipCard: {
     borderRadius: 22,
