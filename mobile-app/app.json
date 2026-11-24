@@ -59,7 +59,10 @@
       "expo-web-browser"
     ],
     "extra": {
-      "apiUrl": "https://pockit-backend-eppq.onrender.com"
+      "apiUrl": "https://pockit-backend-eppq.onrender.com",
+      "eas": {
+        "projectId": "e0b321f7-1d2b-4903-b8e3-96a8f025eeb4"
+      }
     }
   }
 }

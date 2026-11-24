@@ -37,6 +37,7 @@ import {
 } from '../services/api';
 import { scheduleDailySpendingReminder } from '../services/notifications';
 import { supabase } from '../services/supabaseClient';
+import { getCallingName, suggestCallingNames } from '../utils/nameHelper';
 
 interface ProfileScreenProps {
   user: UserData;
@@ -79,6 +80,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   // Edit Profile Modal State
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editFullName, setEditFullName] = useState(currentUser.full_name);
+  const [editCallingName, setEditCallingName] = useState(currentUser.calling_name || getCallingName(currentUser.full_name));
   const [editAvatarUrl, setEditAvatarUrl] = useState(currentUser.avatar_url || AVATAR_PRESETS[0]);
   const [editUniType, setEditUniType] = useState('Public');
   const [editYear, setEditYear] = useState('2nd year');
@@ -120,6 +122,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   useEffect(() => {
     setCurrentUser(user);
     setEditFullName(user.full_name);
+    setEditCallingName(user.calling_name || getCallingName(user.full_name));
     if (user.avatar_url) {
       setEditAvatarUrl(user.avatar_url);
     }
@@ -168,6 +171,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     try {
       const res = await updateUserProfile(currentUser.id, {
         fullName: editFullName.trim(),
+        callingName: editCallingName.trim() || undefined,
         avatarUrl: editAvatarUrl,
         universityType: editUniType,
         yearOfStudy: editYear,
@@ -496,7 +500,14 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             </View>
 
             <View style={styles.userInfoCol}>
-              <Text style={[styles.userName, { color: theme.textPrimary }]}>{currentUser.full_name}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                <Text style={[styles.userName, { color: theme.textPrimary }]}>{currentUser.full_name}</Text>
+                <View style={[styles.callingNameBadge, { backgroundColor: isDark ? 'rgba(244, 123, 78, 0.15)' : '#FDECE4' }]}>
+                  <Text style={[styles.callingNameBadgeText, { color: theme.primary }]}>
+                    {getCallingName(currentUser.full_name, currentUser.calling_name)}
+                  </Text>
+                </View>
+              </View>
               <Text style={[styles.userEmail, { color: theme.textSecondary }]}>{currentUser.email}</Text>
               {(currentUser.email?.toLowerCase().includes('@gmail.com') || currentUser.email?.toLowerCase().includes('google')) && (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3, marginBottom: 2 }}>
@@ -1201,10 +1212,75 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
               <TextInput
                 style={[styles.editInput, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border, color: theme.textPrimary }]}
                 value={editFullName}
-                onChangeText={setEditFullName}
+                onChangeText={(val) => {
+                  setEditFullName(val);
+                  if (!editCallingName || editCallingName === getCallingName(editFullName)) {
+                    setEditCallingName(getCallingName(val));
+                  }
+                }}
                 placeholder={t.namePlaceholder}
                 placeholderTextColor={theme.textMuted}
               />
+
+              {/* Preferred Calling Name (ডাকনাম / সম্বোধন) */}
+              <View style={{ marginTop: 14 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>
+                    {language === 'bn' ? 'অ্যাপসে পছন্দের ডাকনাম (Calling Name)' : 'Preferred Calling Name / Nickname'}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: theme.textMuted }}>
+                    {language === 'bn' ? 'হোমে দেখাবে' : 'Used on Home'}
+                  </Text>
+                </View>
+                <TextInput
+                  style={[styles.editInput, { backgroundColor: theme.surfaceSubtle, borderColor: theme.border, color: theme.textPrimary, marginTop: 6 }]}
+                  value={editCallingName}
+                  onChangeText={setEditCallingName}
+                  placeholder={language === 'bn' ? 'যেমন: Swapnil' : 'e.g., Swapnil'}
+                  placeholderTextColor={theme.textMuted}
+                />
+
+                {/* 1-Tap Calling Name Suggestions */}
+                {suggestCallingNames(editFullName).length > 0 && (
+                  <View style={{ marginTop: 6 }}>
+                    <Text style={{ fontSize: 11, color: theme.textSecondary, marginBottom: 5 }}>
+                      {language === 'bn' ? 'বাছাই করুন:' : 'Suggestions from your name:'}
+                    </Text>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                      {suggestCallingNames(editFullName).map((sug) => {
+                        const isSelected = editCallingName.trim().toLowerCase() === sug.toLowerCase();
+                        return (
+                          <TouchableOpacity
+                            key={sug}
+                            style={[
+                              styles.suggestionChip,
+                              {
+                                backgroundColor: isSelected
+                                  ? theme.primary
+                                  : (isDark ? 'rgba(255, 255, 255, 0.08)' : '#F1F5F9'),
+                                borderColor: isSelected ? theme.primary : theme.border,
+                              },
+                            ]}
+                            onPress={() => {
+                              try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
+                              setEditCallingName(sug);
+                            }}
+                          >
+                            <Text
+                              style={[
+                                styles.suggestionChipText,
+                                { color: isSelected ? '#FFFFFF' : theme.textPrimary },
+                              ]}
+                            >
+                              {sug}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </View>
+                )}
+              </View>
 
               {/* University Type */}
               <Text style={[styles.inputLabel, { color: theme.textSecondary, marginTop: 12 }]}>
@@ -2412,5 +2488,24 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 17,
     fontWeight: '500',
+  },
+  callingNameBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  callingNameBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  suggestionChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  suggestionChipText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
 });

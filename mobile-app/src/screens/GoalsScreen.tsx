@@ -14,7 +14,7 @@ import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../constants/ThemeContext';
 import { TRANSLATIONS, Language } from '../constants/translations';
-import { fetchSavingsGoals, toggleGoalPause, SavingsGoal } from '../services/api';
+import { fetchSavingsGoals, toggleGoalPause, deleteSavingsGoal, SavingsGoal } from '../services/api';
 import { SavingsGoalCard } from '../components/SavingsGoalCard';
 import { CreateGoalModal } from '../components/CreateGoalModal';
 import { BoostGoalModal } from '../components/BoostGoalModal';
@@ -93,6 +93,36 @@ export const GoalsScreen: React.FC<GoalsScreenProps> = ({
   const handleOpenSweep = (goal: SavingsGoal) => {
     setSelectedGoal(goal);
     setSweepModalVisible(true);
+  };
+
+  const handleDeleteGoal = (goal: SavingsGoal) => {
+    Alert.alert(
+      language === 'bn' ? 'লক্ষ্য মুছে ফেলবেন?' : 'Delete Savings Goal?',
+      language === 'bn'
+        ? `আপনি কি নিশ্চিত যে "${goal.title}" লক্ষ্যটি মুছে ফেলতে চান? আপনার মাসিক সঞ্চয় ও দৈনিক সীমার হিসাব স্বয়ংক্রিয়ভাবে সমন্বয় করা হবে।`
+        : `Are you sure you want to delete "${goal.title}"? Your monthly savings and daily limits will be recalibrated.`,
+      [
+        { text: language === 'bn' ? 'না' : 'Cancel', style: 'cancel' },
+        {
+          text: language === 'bn' ? 'মুছে ফেলুন' : 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+              await deleteSavingsGoal(goal.id, userId);
+              setGoals((prev) => prev.filter((g) => g.id !== goal.id));
+              if (selectedGoal?.id === goal.id) {
+                const remaining = goals.filter((g) => g.id !== goal.id);
+                setSelectedGoal(remaining.length > 0 ? remaining[0] : null);
+              }
+              if (onRefreshParent) onRefreshParent();
+            } catch (err: any) {
+              Alert.alert('Error', err.message || 'Failed to delete goal');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleGoalUpdated = (updated: SavingsGoal) => {
@@ -226,8 +256,93 @@ export const GoalsScreen: React.FC<GoalsScreenProps> = ({
           onTogglePause={handleTogglePause}
           onCreateGoal={() => setCreateModalVisible(true)}
           onOpenSweep={handleOpenSweep}
+          onDeleteGoal={handleDeleteGoal}
           leftoverSweepAmount={350}
         />
+
+        {/* Other Goals Section (Image 3 Style) */}
+        {goals.length > 1 && (
+          <View style={styles.otherGoalsSection}>
+            <View style={styles.otherGoalsHeader}>
+              <Text style={[styles.sectionHeading, { color: theme.textPrimary, marginBottom: 0 }]}>
+                {language === 'bn' ? 'অন্যান্য লক্ষ্যসমূহ' : 'Other Goals'}
+              </Text>
+              <TouchableOpacity
+                onPress={() => setCreateModalVisible(true)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.viewAllText, { color: theme.primaryAccent }]}>
+                  {language === 'bn' ? '+ নতুন যোগ করুন' : '+ Add New'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {goals.slice(1).map((g) => {
+              const gPct = Math.min(100, Math.max(0, g.progress_pct || 0));
+              const categoryIcon =
+                g.category?.toLowerCase().includes('gadget') || g.title.toLowerCase().includes('monitor')
+                  ? 'laptop-outline'
+                  : g.category?.toLowerCase().includes('travel') || g.title.toLowerCase().includes('trip')
+                  ? 'airplane-outline'
+                  : g.category?.toLowerCase().includes('education') || g.title.toLowerCase().includes('course')
+                  ? 'school-outline'
+                  : 'sparkles-outline';
+
+              return (
+                <View
+                  key={g.id}
+                  style={[
+                    styles.otherGoalCard,
+                    {
+                      backgroundColor: isDark ? 'rgba(23, 37, 56, 0.7)' : '#FFFFFF',
+                      borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(83, 122, 150, 0.12)',
+                      shadowColor: isDark ? '#000000' : '#466B85',
+                    },
+                  ]}
+                >
+                  <View style={styles.otherGoalLeft}>
+                    <View
+                      style={[
+                        styles.otherGoalIconBox,
+                        { backgroundColor: isDark ? 'rgba(83, 122, 150, 0.2)' : '#EAF2F8' },
+                      ]}
+                    >
+                      <Ionicons name={categoryIcon as any} size={20} color={theme.slateBlue} />
+                    </View>
+                    <View style={{ flex: 1, marginRight: 10 }}>
+                      <Text style={[styles.otherGoalTitle, { color: theme.textPrimary }]} numberOfLines={1}>
+                        {g.title}
+                      </Text>
+                      <Text style={[styles.otherGoalNumbers, { color: theme.textSecondary }]}>
+                        ৳{Math.round(g.current_saved).toLocaleString()} / ৳{Math.round(g.target_amount).toLocaleString()}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.otherGoalRight}>
+                    <Text style={[styles.otherGoalPct, { color: theme.primaryAccent }]}>
+                      {gPct.toFixed(0)}%
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => handleOpenBoost(g)}
+                      style={[styles.miniBoostBtn, { backgroundColor: isDark ? 'rgba(224, 122, 95, 0.18)' : '#FDF0EC' }]}
+                      hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                    >
+                      <Ionicons name="flash-outline" size={13} color={theme.primaryAccent} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => handleDeleteGoal(g)}
+                      style={[styles.miniDeleteBtn, { backgroundColor: isDark ? 'rgba(239, 68, 68, 0.15)' : '#FEF2F2' }]}
+                      hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                    >
+                      <Ionicons name="trash-outline" size={13} color={isDark ? '#F87171' : '#EF4444'} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        )}
 
         {/* Milestone Walkthrough */}
         {activeGoal && (
@@ -462,6 +577,80 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
     flex: 1,
+  },
+  otherGoalsSection: {
+    marginTop: 18,
+    marginBottom: 16,
+  },
+  otherGoalsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    marginBottom: 12,
+  },
+  viewAllText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  otherGoalCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 14,
+    marginBottom: 10,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  otherGoalLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  otherGoalIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  otherGoalTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  otherGoalNumbers: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  otherGoalRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  otherGoalPct: {
+    fontSize: 13,
+    fontWeight: '700',
+    marginRight: 4,
+  },
+  miniBoostBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  miniDeleteBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
 

@@ -28,6 +28,7 @@ export const BRANDING = {
   // Asset File References (Drop your custom images in assets/brand/)
   assets: {
     logo: require('../../assets/brand/logo.png'),
+    wallet: require('../../assets/brand/pockit_wallet.png'),
     splashIcon: require('../../assets/brand/splash-icon.png'),
     adaptiveIcon: require('../../assets/brand/adaptive-icon.png'),
   },

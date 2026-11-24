@@ -476,6 +476,7 @@ def update_student_profile(user_id: str, req: UpdateProfileRequest):
     res = db.update_user_profile(
         user_id=user_id,
         full_name=req.full_name,
+        calling_name=req.calling_name,
         avatar_url=req.avatar_url,
         university_type=req.university_type,
         year_of_study=req.year_of_study,
@@ -1007,6 +1008,30 @@ def sweep_leftover(goal_id: str, req: SweepLeftoverRequest):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Sweep leftover error: {str(e)}")
+
+
+@app.delete("/api/goals/{goal_id}")
+def delete_goal(goal_id: str, user_id: str = Query(..., description="User ID owner")):
+    """Permanently deletes a savings goal and recalibrates protected target savings & live risk."""
+    try:
+        success = db.delete_savings_goal(goal_id, user_id)
+        if not success:
+            raise HTTPException(status_code=404, detail="Savings goal not found or unauthorized.")
+        summary, metrics = pipeline_service.evaluate_live_student_risk(
+            user_id,
+            trigger_event="goal_deleted"
+        )
+        return {
+            "status": "success",
+            "message": "Savings goal deleted successfully",
+            "updated_risk": summary,
+            "daily_safe_to_spend": metrics["daily_safe_to_spend"],
+            "remaining_balance": metrics["remaining_balance"]
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Delete goal error: {str(e)}")
 
 
 @app.get("/api/streak/{user_id}")

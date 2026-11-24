@@ -76,6 +76,7 @@ class Database:
                 ("subscription_expiry", "TEXT DEFAULT NULL"),
                 ("pin_code_hash", "TEXT DEFAULT NULL"),
                 ("avatar_url", "TEXT DEFAULT NULL"),
+                ("calling_name", "TEXT DEFAULT NULL"),
                 ("daily_coach_queries_used", "INTEGER DEFAULT 0"),
                 ("daily_coach_queries_date", "TEXT DEFAULT NULL"),
                 ("on_track_streak", "INTEGER DEFAULT 0"),
@@ -426,7 +427,7 @@ class Database:
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT id, email, full_name, is_demo, is_pro, subscription_expiry, pin_code_hash, avatar_url FROM users
+                SELECT id, email, full_name, calling_name, is_demo, is_pro, subscription_expiry, pin_code_hash, avatar_url FROM users
                 WHERE email = ? AND password_hash = ?
             """, (email.lower().strip(), hashed))
             row = cursor.fetchone()
@@ -437,7 +438,7 @@ class Database:
     def get_user(self, user_id: str) -> Optional[Dict[str, Any]]:
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT id, email, full_name, is_demo, is_pro, subscription_expiry, pin_code_hash, avatar_url FROM users WHERE id = ?", (user_id,))
+            cursor.execute("SELECT id, email, full_name, calling_name, is_demo, is_pro, subscription_expiry, pin_code_hash, avatar_url FROM users WHERE id = ?", (user_id,))
             row = cursor.fetchone()
             return dict(row) if row else None
 
@@ -448,7 +449,7 @@ class Database:
 
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT id, email, full_name, is_demo, is_pro, subscription_expiry, pin_code_hash, avatar_url FROM users WHERE email = ?", (email_clean,))
+            cursor.execute("SELECT id, email, full_name, calling_name, is_demo, is_pro, subscription_expiry, pin_code_hash, avatar_url FROM users WHERE email = ?", (email_clean,))
             row = cursor.fetchone()
 
             if row:
@@ -480,6 +481,7 @@ class Database:
                     "id": user_id,
                     "email": email_clean,
                     "full_name": full_name.strip(),
+                    "calling_name": None,
                     "avatar_url": avatar_url,
                     "is_demo": 0,
                     "is_pro": 0,
@@ -520,6 +522,7 @@ class Database:
         self,
         user_id: str,
         full_name: Optional[str] = None,
+        calling_name: Optional[str] = None,
         avatar_url: Optional[str] = None,
         university_type: Optional[str] = None,
         year_of_study: Optional[str] = None,
@@ -540,6 +543,9 @@ class Database:
             if full_name is not None and full_name.strip():
                 updates.append("full_name = ?")
                 params.append(full_name.strip())
+            if calling_name is not None:
+                updates.append("calling_name = ?")
+                params.append(calling_name.strip())
             if avatar_url is not None:
                 updates.append("avatar_url = ?")
                 params.append(avatar_url.strip())
@@ -1682,6 +1688,28 @@ class Database:
 
     def sweep_leftover_to_goal(self, goal_id: str, user_id: str, amount: float) -> Dict[str, Any]:
         return self.boost_savings_goal(goal_id, user_id, amount)
+
+    def delete_savings_goal(self, goal_id: str, user_id: str) -> bool:
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM savings_goals WHERE id = ? AND user_id = ?", (goal_id, user_id))
+            conn.commit()
+            deleted = cursor.rowcount > 0
+
+        if deleted:
+            rem = self.get_active_goal(user_id)
+            if rem and not rem.get("is_paused"):
+                self.update_target_savings(user_id, rem.get("required_monthly_savings", rem.get("monthly_commitment", 0.0)))
+            else:
+                self.update_target_savings(user_id, 0.0)
+
+        if self.supabase and deleted:
+            try:
+                self.supabase.table('savings_goals').delete().eq('id', self._to_uuid(goal_id)).execute()
+            except Exception as e:
+                print(f"[Supabase sync notice] delete_savings_goal: {e}")
+
+        return deleted
 
     def get_and_update_streak(self, user_id: str) -> int:
         today_str = datetime.now().strftime("%Y-%m-%d")

@@ -30,6 +30,7 @@ class UserData(BaseModel):
     id: str
     email: str
     full_name: str
+    calling_name: Optional[str] = None
     is_demo: bool = False
     is_pro: bool = False
     has_pin: bool = False
@@ -46,6 +47,7 @@ class GoogleAuthRequest(BaseModel):
 
 class UpdateProfileRequest(BaseModel):
     full_name: Optional[str] = None
+    calling_name: Optional[str] = None
     avatar_url: Optional[str] = None
     university_type: Optional[str] = None
     year_of_study: Optional[str] = None

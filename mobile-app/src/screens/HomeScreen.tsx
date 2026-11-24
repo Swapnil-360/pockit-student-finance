@@ -8,6 +8,7 @@ import {
   RefreshControl,
   Platform,
   StatusBar,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -31,6 +32,7 @@ import { CompactRiskGauge } from '../components/CompactRiskGauge';
 import { MessMealTrackerModal } from '../components/MessMealTrackerModal';
 import { sendHighRiskAlertNotification } from '../services/notifications';
 import { getRandomQuote, getNextQuote, MotivationalQuote } from '../constants/quotes';
+import { getCallingName } from '../utils/nameHelper';
 
 interface HomeScreenProps {
   user: UserData;
@@ -43,6 +45,7 @@ interface HomeScreenProps {
   onOpenProModal: () => void;
   onNavigateToTransactions: () => void;
   onNavigateToCoach?: () => void;
+  onNavigateToGoals?: () => void;
   onNavigateToProfile?: () => void;
   onToggleLanguage: () => void;
 }
@@ -58,6 +61,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onOpenProModal,
   onNavigateToTransactions,
   onNavigateToCoach,
+  onNavigateToGoals,
   onNavigateToProfile,
   onToggleLanguage,
 }) => {
@@ -247,40 +251,39 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           />
         }
       >
-        {/* 1. Header with App Title, Greeting, and User Profile Avatar */}
+        {/* 1. Header: Pockit Logo + Title on Left; Notification Bell + Avatar on Right (Image 1 Style) */}
         <View style={styles.headerBar}>
-          <View style={styles.headerLeft}>
-            <BrandLogo size="sm" />
-            <View>
-              <Text style={[styles.dashboardTitle, { color: theme.textSecondary }]}>
-                {language === 'bn' ? 'ড্যাশবোর্ড' : 'Dashboard'}
-              </Text>
-              <Text style={[styles.greetingName, { color: theme.textPrimary }]}>
-                {t.greeting}, {formatGreetingName(user.full_name)}
-              </Text>
-            </View>
+          <View style={styles.headerLeftBrand}>
+            <Image
+              source={BRANDING.assets.wallet}
+              style={styles.pockitLogoImg}
+              resizeMode="contain"
+            />
+            <Text style={[styles.pockitTitleText, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+              Pockit
+            </Text>
           </View>
 
-          <View style={styles.headerRight}>
+          <View style={styles.headerRightActions}>
             <TouchableOpacity
               style={[
-                styles.infoGuideBtn,
+                styles.notifBtn,
                 {
-                  backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : '#E2EBF2',
-                  borderColor: theme.border,
+                  backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : '#FFFFFF',
+                  borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(83, 122, 150, 0.15)',
+                  shadowColor: isDark ? '#000000' : '#466B85',
                 },
               ]}
               onPress={() => {
-                try {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                } catch {}
+                try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
                 setWalkthroughVisible(true);
               }}
-              activeOpacity={0.75}
+              activeOpacity={0.8}
               accessibilityRole="button"
-              accessibilityLabel="Open Feature Guide"
+              accessibilityLabel="Notifications and Feature Guide"
             >
-              <Ionicons name="information" size={20} color={theme.slateBlue} />
+              <Ionicons name="notifications-outline" size={20} color={isDark ? '#F8FAFC' : '#1E293B'} />
+              <View style={styles.notifRedDot} />
             </TouchableOpacity>
 
             <UserAvatar
@@ -292,290 +295,402 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </View>
         </View>
 
-        {/* 2. 'Daily Tips' Banner Card (Soft powder slate-blue banner + Safe Daily Spend) */}
-        <View style={styles.dailyTipsCompoundWrapper}>
-          {/* Top Banner (Dusty Slate-Blue / Powder Accent) */}
-          <View
-            style={[
-              styles.topBannerStrip,
-              {
-                backgroundColor: isDark ? 'rgba(30, 46, 66, 0.95)' : theme.slateBlueTint,
-                borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : theme.border,
-              },
-            ]}
-          >
-            <View style={styles.bannerLeft}>
-              <Ionicons
-                name="shield-checkmark"
-                size={18}
-                color={isDark ? '#38BDF8' : theme.slateBlue}
-              />
-              <Text style={[styles.bannerHeading, { color: isDark ? '#F8FAFC' : theme.slateBlue }]} numberOfLines={1}>
-                {t.dailySafeSpend}
-              </Text>
-            </View>
+        {/* 2. Greeting Section (Image 1 Style) */}
+        <View style={styles.greetingSection}>
+          <Text style={[styles.greetingMainText, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+            {language === 'bn'
+              ? `হ্যালো, ${getCallingName(user.full_name, user.calling_name)} 👋`
+              : `Hello, ${getCallingName(user.full_name, user.calling_name)} 👋`}
+          </Text>
+          <Text style={[styles.greetingSubText, { color: theme.textSecondary }]}>
+            {language === 'bn' ? 'চলতি মাসে আর্থিক ট্র্যাকে থাকুন!' : 'Stay on track this month!'}
+          </Text>
+        </View>
 
-            <View style={[styles.burnPill, { backgroundColor: burnDetails.bg, borderColor: burnDetails.border }]}>
-              <Text style={[styles.burnPillText, { color: burnDetails.text }]}>
-                {burnDetails.label}
-              </Text>
-            </View>
-          </View>
-
-          {/* Overlapping Main Card */}
-          <GlassCard style={styles.dailyTipsMainCard}>
-            {/* Side-by-Side Hero Split (Safe Daily Limit Left + Compact Risk Gauge Right) */}
-            <View style={styles.heroSplitRow}>
-              {/* Left Column: Big Amount, Days Left, Target Savings Pill */}
-              <View style={styles.heroLeftCol}>
-                <View style={styles.amountDisplayRow}>
-                  <Text style={[styles.currencySymbol, { color: theme.primary }]}>৳</Text>
-                  <Text style={[styles.amountBig, { color: theme.textPrimary }]}>
-                    {dashboard.daily_safe_to_spend}
-                  </Text>
-                  <Text style={[styles.perDayText, { color: theme.textSecondary }]}>
-                    / {language === 'bn' ? 'দিন' : 'day'}
-                  </Text>
+        {/* 3. Hero Card: Safe Daily Spending Limit on Left + Financial Risk Gauge on Right (Image 1 Style) */}
+        <View
+          style={[
+            styles.heroCard,
+            {
+              backgroundColor: isDark ? 'rgba(23, 37, 56, 0.85)' : '#FFFFFF',
+              borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(83, 122, 150, 0.12)',
+              shadowColor: isDark ? '#000000' : '#466B85',
+            },
+          ]}
+        >
+          <View style={styles.heroSplit}>
+            {/* Left Column: Safe Daily Spending Limit */}
+            <View style={styles.heroLeftCol}>
+              <View style={styles.heroLabelRow}>
+                <View style={[styles.shieldIconWrap, { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.18)' : '#ECFDF5' }]}>
+                  <Ionicons name="shield-checkmark" size={13} color="#10B981" />
                 </View>
-
-                <Text style={[styles.daysRemainText, { color: theme.textSecondary }]}>
-                  {language === 'bn'
-                    ? `বাকি ${dashboard.days_remaining} দিনের মেস/ভাড়ামুক্ত দৈনিক বরাদ্দ`
-                    : `${dashboard.days_remaining} days remaining in month`}
+                <Text style={[styles.heroColumnLabel, { color: isDark ? '#94A3B8' : '#64748B' }]} numberOfLines={1}>
+                  {language === 'bn' ? 'নিরাপদ দৈনিক খরচ' : 'Safe Daily Spending Limit'}
                 </Text>
-
-                {/* Clean Interactive Target Savings Pill */}
-                <TouchableOpacity
-                  style={[
-                    styles.targetSavingsPill,
-                    {
-                      backgroundColor: isDark ? 'rgba(244, 123, 78, 0.14)' : '#FDECE4',
-                      borderColor: isDark ? 'rgba(244, 123, 78, 0.35)' : 'rgba(242, 122, 73, 0.45)',
-                    },
-                  ]}
-                  onPress={() => {
-                    try {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    } catch {}
-                    setSavingsModalVisible(true);
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <Text style={[styles.targetSavingsPillText, { color: theme.primary }]}>
-                    {dashboard.target_savings > 0
-                      ? `${language === 'bn' ? 'সঞ্চয়' : 'Target'}: ৳${Math.round(dashboard.target_savings).toLocaleString()}`
-                      : `${language === 'bn' ? 'সঞ্চয় লক্ষ্য নির্ধারণ' : 'Set Savings Goal'}`}
-                  </Text>
-                  <Ionicons name="pencil-outline" size={11} color={theme.primary} style={{ marginLeft: 5 }} />
-                </TouchableOpacity>
               </View>
 
-              {/* Right Column (flex: 0.85): Compact Live Risk Gauge */}
-              <View style={styles.heroRightCol}>
-                <CompactRiskGauge
-                  score={current_risk.risk_score_pct}
-                  tier={current_risk.risk_tier}
-                  tierBn={current_risk.risk_tier_bn}
-                  language={language}
-                  size={108}
-                  strokeWidth={9}
-                  onPress={() => {
-                    try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
-                    setRiskDetailsVisible(true);
-                  }}
-                />
+              <View style={styles.heroAmountRow}>
+                <Text style={[styles.heroCurrencySymbol, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>৳</Text>
+                <Text style={[styles.heroAmountNum, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+                  {dashboard.daily_safe_to_spend}
+                </Text>
+                <Text style={[styles.heroPerDay, { color: theme.textSecondary }]}>
+                  / {language === 'bn' ? 'দিন' : 'day'}
+                </Text>
               </View>
+
+              {/* On-Track Pill Badge */}
+              {(() => {
+                const isOver = (dashboard.spendable_variable_pool !== undefined ? dashboard.spendable_variable_pool : dashboard.remaining_balance) <= 0;
+                return (
+                  <View
+                    style={[
+                      styles.onTrackPill,
+                      {
+                        backgroundColor: isOver
+                          ? (isDark ? 'rgba(239, 68, 68, 0.2)' : '#FEF2F2')
+                          : (isDark ? 'rgba(16, 185, 129, 0.18)' : '#ECFDF5'),
+                        borderColor: isOver ? '#FECACA' : '#A7F3D0',
+                      },
+                    ]}
+                  >
+                    <Ionicons
+                      name={isOver ? 'alert-circle' : 'checkmark'}
+                      size={12}
+                      color={isOver ? '#EF4444' : '#10B981'}
+                      style={{ marginRight: 4 }}
+                    />
+                    <Text
+                      style={[
+                        styles.onTrackPillText,
+                        { color: isOver ? '#EF4444' : '#059669' },
+                      ]}
+                    >
+                      {isOver
+                        ? (language === 'bn' ? 'সীমার বেশি খরচ হচ্ছে' : 'Over daily pace')
+                        : (language === 'bn' ? "আপনি ট্র্যাকে আছেন!" : "You're on track!")}
+                    </Text>
+                  </View>
+                );
+              })()}
             </View>
 
-            {/* Dipping into Savings Warning Banner */}
-            {dashboard.dipping_into_savings && (
-              <View
-                style={[
-                  styles.savingsAlertBanner,
-                  {
-                    backgroundColor: isDark ? 'rgba(244, 123, 78, 0.22)' : '#FDECE4',
-                    borderColor: theme.primary,
-                  },
-                ]}
-              >
-                <Ionicons name="warning" size={18} color={theme.primary} />
-                <Text style={[styles.savingsAlertText, { color: theme.primary }]}>
-                  {language === 'bn'
-                    ? (dashboard.savings_warning_bn || t.dippingSavingsAlert)
-                    : (dashboard.savings_warning_en || t.dippingSavingsAlert)}
-                </Text>
-              </View>
-            )}
+            {/* Vertical Line Divider */}
+            <View style={[styles.heroVerticalLine, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : '#F1F5F9' }]} />
 
-            {/* Clean Inspiring Financial Mindset Card (Tap to change quote) */}
+            {/* Right Column: Financial Risk */}
             <TouchableOpacity
-              style={[
-                styles.quoteInnerBlock,
-                {
-                  backgroundColor: isDark ? 'rgba(255, 255, 255, 0.04)' : 'rgba(90, 130, 150, 0.06)',
-                  borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(90, 130, 150, 0.15)',
-                },
-              ]}
-              onPress={handleNextQuote}
-              activeOpacity={0.8}
-              accessibilityRole="button"
-              accessibilityLabel="Tap to cycle daily mindset quote"
-            >
-              <Text style={[styles.quoteMainText, { color: theme.textPrimary }]}>
-                “{language === 'bn' ? currentQuote.bn : currentQuote.en}”
-              </Text>
-            </TouchableOpacity>
-
-            {/* Compact Risk Insight Strip Inside Hero Card (Tap for details) */}
-            <TouchableOpacity
-              style={[
-                styles.riskInsightPill,
-                {
-                  backgroundColor: isDark
-                    ? 'rgba(255, 255, 255, 0.04)'
-                    : (current_risk.risk_score_pct >= 70 ? '#FEF2F2' : current_risk.risk_score_pct >= 40 ? '#FFFBEB' : '#ECFDF5'),
-                  borderColor: isDark
-                    ? 'rgba(255, 255, 255, 0.08)'
-                    : (current_risk.risk_score_pct >= 70 ? 'rgba(244, 123, 78, 0.35)' : current_risk.risk_score_pct >= 40 ? 'rgba(245, 158, 11, 0.35)' : 'rgba(16, 185, 129, 0.35)'),
-                },
-              ]}
+              style={styles.heroRightCol}
               onPress={() => {
                 try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
                 setRiskDetailsVisible(true);
               }}
               activeOpacity={0.8}
             >
-              <View style={styles.riskInsightLeft}>
-                <Ionicons
-                  name={current_risk.risk_score_pct >= 70 ? 'warning' : current_risk.risk_score_pct >= 40 ? 'alert-circle' : 'shield-checkmark'}
-                  size={15}
-                  color={current_risk.risk_score_pct >= 70 ? theme.primary : current_risk.risk_score_pct >= 40 ? theme.riskModerate : theme.riskLow}
+              <View style={styles.heroLabelRow}>
+                <Ionicons name="stats-chart" size={13} color="#10B981" />
+                <Text style={[styles.heroColumnLabel, { color: isDark ? '#94A3B8' : '#64748B' }]} numberOfLines={1}>
+                  {language === 'bn' ? 'আর্থিক ঝুঁকি' : 'Financial Risk'}
+                </Text>
+              </View>
+
+              <View style={styles.riskGaugeWrap}>
+                <CompactRiskGauge
+                  score={current_risk.risk_score_pct}
+                  tier={current_risk.risk_tier}
+                  tierBn={current_risk.risk_tier_bn}
+                  language={language}
+                  size={84}
+                  strokeWidth={8}
+                  onPress={() => setRiskDetailsVisible(true)}
                 />
-                <Text style={[styles.riskInsightText, { color: theme.textPrimary }]} numberOfLines={2}>
-                  {getRiskInsightSummary()}
-                </Text>
               </View>
-              <View style={styles.riskInsightRight}>
-                <Text style={[styles.riskInsightTapText, { color: theme.textSecondary }]}>
-                  {language === 'bn' ? 'বিস্তারিত' : 'Details'}
-                </Text>
-                <Ionicons name="chevron-forward" size={13} color={theme.textSecondary} />
-              </View>
-            </TouchableOpacity>
 
-            {/* 3-Column Mini Breakdown Strip (Three-Bucket Architecture) */}
-            <View style={[styles.metricStrip, { borderTopColor: isDark ? 'rgba(255, 255, 255, 0.08)' : theme.border, marginBottom: 0 }]}>
-              {/* Bucket 1: Rent & Mess Paid */}
-              <TouchableOpacity
-                style={styles.metricItem}
-                onPress={() => {
-                  try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
-                  setMessMealModalVisible(true);
-                }}
-                activeOpacity={0.75}
+              <Text
+                style={[
+                  styles.riskTierBottomText,
+                  {
+                    color: current_risk.risk_score_pct >= 70
+                      ? '#EF4444'
+                      : current_risk.risk_score_pct >= 40
+                      ? '#F59E0B'
+                      : '#10B981',
+                  },
+                ]}
               >
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                  <Text style={[styles.metricItemLabel, { color: theme.textSecondary }]} numberOfLines={1}>
-                    {dashboard.enable_mess_meals !== false
-                      ? t.rentAndMessPaid
-                      : (language === 'bn' ? 'বাসাভাড়া ও নির্দিষ্ট' : 'Housing & Fixed')}
-                  </Text>
-                  <Ionicons
-                    name={dashboard.enable_mess_meals !== false ? 'restaurant-outline' : 'home-outline'}
-                    size={10}
-                    color={theme.primary}
-                  />
-                </View>
-                <Text style={[styles.metricItemVal, { color: isDark ? '#E2E8F0' : '#475569' }]}>
-                  ৳{dashboard.fixed_obligations_spent !== undefined
-                    ? dashboard.fixed_obligations_spent
-                    : (dashboard.category_breakdown?.['Rent'] || 0)}
-                </Text>
-                {dashboard.enable_mess_meals !== false ? (
-                  dashboard.fixed_rent !== undefined && dashboard.mess_meal_fixed !== undefined && (dashboard.fixed_rent > 0 || dashboard.mess_meal_fixed > 0) ? (
-                    <Text style={{ fontSize: 9, color: theme.textMuted, marginTop: 1 }} numberOfLines={1}>
-                      {dashboard.fixed_rent > 0 && dashboard.mess_meal_fixed > 0
-                        ? language === 'bn'
-                          ? `ভাড়া ${dashboard.fixed_rent >= 1000 ? (dashboard.fixed_rent / 1000).toFixed(dashboard.fixed_rent % 1000 === 0 ? 0 : 1) + 'k' : '৳' + dashboard.fixed_rent} + মেস ${dashboard.mess_meal_fixed >= 1000 ? (dashboard.mess_meal_fixed / 1000).toFixed(dashboard.mess_meal_fixed % 1000 === 0 ? 0 : 1) + 'k' : '৳' + dashboard.mess_meal_fixed}`
-                          : `Rent ${dashboard.fixed_rent >= 1000 ? (dashboard.fixed_rent / 1000).toFixed(dashboard.fixed_rent % 1000 === 0 ? 0 : 1) + 'k' : '৳' + dashboard.fixed_rent} + Meal ${dashboard.mess_meal_fixed >= 1000 ? (dashboard.mess_meal_fixed / 1000).toFixed(dashboard.mess_meal_fixed % 1000 === 0 ? 0 : 1) + 'k' : '৳' + dashboard.mess_meal_fixed}`
-                        : dashboard.fixed_rent > 0
-                        ? language === 'bn'
-                          ? `ভাড়া ৳${dashboard.fixed_rent}`
-                          : `Rent ৳${dashboard.fixed_rent}`
-                        : language === 'bn'
-                        ? `মেস খাবার ৳${dashboard.mess_meal_fixed}`
-                        : `Meals ৳${dashboard.mess_meal_fixed}`}
-                    </Text>
-                  ) : null
-                ) : (
-                  <Text style={{ fontSize: 9, color: theme.textMuted, marginTop: 1 }} numberOfLines={1}>
-                    {dashboard.fixed_rent && dashboard.fixed_rent > 0
-                      ? language === 'bn'
-                        ? `ভাড়া ৳${dashboard.fixed_rent}`
-                        : `Rent ৳${dashboard.fixed_rent}`
-                      : language === 'bn'
-                      ? 'খাবার দৈনিক খরচে'
-                      : 'Food via daily'}
-                  </Text>
-                )}
-              </TouchableOpacity>
-
-              <View style={[styles.metricDivider, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : theme.border }]} />
-
-              {/* Bucket 2: Protected Savings */}
-              <View style={styles.metricItem}>
-                <Text style={[styles.metricItemLabel, { color: theme.textSecondary }]}>
-                  {t.protectedSavings}
-                </Text>
-                <Text style={[styles.metricItemVal, { color: isDark ? '#34D399' : '#059669' }]}>
-                  ৳{dashboard.target_savings || 0}
-                </Text>
-              </View>
-
-              <View style={[styles.metricDivider, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : theme.border }]} />
-
-              {/* Bucket 3: Variable Pocket Left */}
-              <View style={styles.metricItem}>
-                <Text style={[styles.metricItemLabel, { color: theme.textSecondary }]}>
-                  {t.variablePocketLeft}
-                </Text>
-                <Text
-                  style={[
-                    styles.metricItemVal,
-                    {
-                      color: (dashboard.spendable_variable_pool !== undefined
-                        ? dashboard.spendable_variable_pool
-                        : dashboard.remaining_balance) <= 0
-                        ? theme.primary
-                        : (isDark ? '#38BDF8' : theme.slateBlue),
-                    },
-                  ]}
-                >
-                  ৳{dashboard.spendable_variable_pool !== undefined
-                    ? dashboard.spendable_variable_pool
-                    : dashboard.remaining_balance}
-                </Text>
-              </View>
-            </View>
-          </GlassCard>
+                {language === 'bn'
+                  ? current_risk.risk_tier_bn
+                  : `${current_risk.risk_tier.charAt(0).toUpperCase() + current_risk.risk_tier.slice(1)} Risk`}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
-        {/* 2.3 7-Day Discipline Tracker Strip */}
-        <DisciplineTracker
-          streakDays={dashboard.on_track_streak || 5}
-          language={language}
-        />
+        {/* 4. 3-Stat Cards Row (Rent & Mess, Savings, Left for the Month - Requirement 2) */}
+        <View style={styles.threeStatRow}>
+          {/* Card 1: Rent & Mess */}
+          <TouchableOpacity
+            style={[
+              styles.statCardItem,
+              {
+                backgroundColor: isDark ? 'rgba(23, 37, 56, 0.85)' : '#FFFFFF',
+                borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(83, 122, 150, 0.12)',
+                shadowColor: isDark ? '#000000' : '#466B85',
+              },
+            ]}
+            onPress={() => {
+              try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
+              setMessMealModalVisible(true);
+            }}
+            activeOpacity={0.8}
+          >
+            <View style={[styles.statIconCircle, { backgroundColor: isDark ? 'rgba(2, 132, 199, 0.18)' : '#E0F2FE' }]}>
+              <Ionicons name="home" size={18} color="#0284C7" />
+            </View>
+            <Text style={[styles.statCardLabel, { color: theme.textSecondary }]} numberOfLines={1}>
+              {dashboard.enable_mess_meals !== false ? 'Rent & Mess' : 'Housing & Fixed'}
+            </Text>
+            <Text style={[styles.statCardVal, { color: isDark ? '#F8FAFC' : '#0F172A' }]} numberOfLines={1}>
+              ৳{Math.round(dashboard.fixed_obligations_spent !== undefined ? dashboard.fixed_obligations_spent : (dashboard.category_breakdown?.['Rent'] || 7000)).toLocaleString()}
+            </Text>
+          </TouchableOpacity>
 
-        {/* 2.5 Dream Goal Vault Card (Target Savings Protection) */}
-        <SavingsGoalCard
-          goal={activeGoal}
-          language={language}
-          onOpenBoost={handleOpenBoost}
-          onTogglePause={handleToggleGoalPause}
-          onCreateGoal={() => setCreateGoalVisible(true)}
-          onOpenSweep={handleOpenSweep}
-          leftoverSweepAmount={Math.max(0, dashboard.spendable_variable_pool > 0 ? 350 : 0)}
-        />
+          {/* Card 2: Savings */}
+          <TouchableOpacity
+            style={[
+              styles.statCardItem,
+              {
+                backgroundColor: isDark ? 'rgba(23, 37, 56, 0.85)' : '#FFFFFF',
+                borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(83, 122, 150, 0.12)',
+                shadowColor: isDark ? '#000000' : '#466B85',
+              },
+            ]}
+            onPress={() => {
+              try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
+              setSavingsModalVisible(true);
+            }}
+            activeOpacity={0.8}
+          >
+            <View style={[styles.statIconCircle, { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.18)' : '#DCFCE7' }]}>
+              <Ionicons name="sparkles" size={17} color="#16A34A" />
+            </View>
+            <Text style={[styles.statCardLabel, { color: theme.textSecondary }]} numberOfLines={1}>
+              {language === 'bn' ? 'সঞ্চয়' : 'Savings'}
+            </Text>
+            <Text style={[styles.statCardVal, { color: isDark ? '#F8FAFC' : '#0F172A' }]} numberOfLines={1}>
+              ৳{Math.round(dashboard.target_savings || 500).toLocaleString()}
+            </Text>
+          </TouchableOpacity>
+
+          {/* Card 3: Left for the Month (Requirement 2!) */}
+          <View
+            style={[
+              styles.statCardItem,
+              {
+                backgroundColor: isDark ? 'rgba(23, 37, 56, 0.85)' : '#FFFFFF',
+                borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(83, 122, 150, 0.12)',
+                shadowColor: isDark ? '#000000' : '#466B85',
+              },
+            ]}
+          >
+            <View style={[styles.statIconCircle, { backgroundColor: isDark ? 'rgba(234, 88, 12, 0.18)' : '#FFEDD5' }]}>
+              <Ionicons name="wallet" size={18} color="#EA580C" />
+            </View>
+            <Text style={[styles.statCardLabel, { color: theme.textSecondary }]} numberOfLines={1}>
+              {language === 'bn' ? 'মাসের বাকি' : 'Left for the Month'}
+            </Text>
+            <Text
+              style={[
+                styles.statCardVal,
+                {
+                  color: (dashboard.spendable_variable_pool !== undefined ? dashboard.spendable_variable_pool : dashboard.remaining_balance) <= 0
+                    ? '#EF4444'
+                    : (isDark ? '#F8FAFC' : '#0F172A'),
+                },
+              ]}
+              numberOfLines={1}
+            >
+              ৳{Math.round(dashboard.spendable_variable_pool !== undefined ? dashboard.spendable_variable_pool : dashboard.remaining_balance).toLocaleString()}
+            </Text>
+          </View>
+        </View>
+
+        {/* 5. Dream Goal Card (Image 1 Style) */}
+        <View
+          style={[
+            styles.dreamGoalCard,
+            {
+              backgroundColor: isDark ? 'rgba(23, 37, 56, 0.85)' : '#FFFFFF',
+              borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(83, 122, 150, 0.12)',
+              shadowColor: isDark ? '#000000' : '#466B85',
+            },
+          ]}
+        >
+          <View style={styles.dreamGoalHeader}>
+            <View style={styles.dreamGoalHeaderLeft}>
+              <View style={[styles.targetIconBox, { backgroundColor: isDark ? 'rgba(234, 88, 12, 0.18)' : '#FFEDD5' }]}>
+                <Ionicons name="disc-outline" size={18} color="#EA580C" />
+              </View>
+              <Text style={[styles.dreamGoalHeaderTitle, { color: isDark ? '#F8FAFC' : '#0F172A' }]}>
+                {language === 'bn' ? 'স্বপ্নের লক্ষ্য' : 'Dream Goal'}
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              onPress={() => {
+                try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
+                if (onNavigateToGoals) onNavigateToGoals();
+              }}
+              style={styles.viewAllBtn}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.viewAllText, { color: theme.textSecondary }]}>
+                {language === 'bn' ? 'সবগুলো দেখুন' : 'View All'}
+              </Text>
+              <Ionicons name="arrow-forward" size={13} color={theme.textSecondary} style={{ marginLeft: 3 }} />
+            </TouchableOpacity>
+          </View>
+
+          {activeGoal ? (
+            <View style={styles.dreamGoalBody}>
+              <View style={[styles.goalThumbBox, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : '#F8FAFC' }]}>
+                <Ionicons name="desktop-outline" size={28} color="#EA580C" />
+              </View>
+
+              <View style={styles.goalInfoCol}>
+                <Text style={[styles.goalItemTitle, { color: isDark ? '#F8FAFC' : '#0F172A' }]} numberOfLines={1}>
+                  {activeGoal.title}
+                </Text>
+                <Text style={[styles.goalItemAmount, { color: theme.textSecondary }]}>
+                  ৳{Math.round(activeGoal.current_saved).toLocaleString()} / ৳{Math.round(activeGoal.target_amount).toLocaleString()}
+                </Text>
+
+                <View style={styles.goalProgressRow}>
+                  <View style={[styles.goalProgressTrack, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : '#E2E8F0' }]}>
+                    <View
+                      style={[
+                        styles.goalProgressFill,
+                        {
+                          width: `${Math.min(100, Math.max(0, activeGoal.progress_pct || 0))}%`,
+                          backgroundColor: '#EA580C',
+                        },
+                      ]}
+                    />
+                  </View>
+                  <Text style={[styles.goalItemPct, { color: isDark ? '#94A3B8' : '#64748B' }]}>
+                    {Math.round(activeGoal.progress_pct || 0)}%
+                  </Text>
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={[styles.homeBoostBtn, { backgroundColor: isDark ? 'rgba(234, 88, 12, 0.2)' : '#FFEDD5' }]}
+                onPress={() => handleOpenBoost(activeGoal)}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.homeBoostBtnText, { color: '#EA580C' }]}>
+                  {language === 'bn' ? 'বুস্ট' : 'Boost'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={styles.noGoalBody}>
+              <TouchableOpacity
+                style={[styles.setGoalOutlineBtn, { borderColor: theme.primary }]}
+                onPress={() => setCreateGoalVisible(true)}
+              >
+                <Ionicons name="add" size={16} color={theme.primary} style={{ marginRight: 4 }} />
+                <Text style={[styles.setGoalOutlineBtnText, { color: theme.primary }]}>
+                  {language === 'bn' ? 'নতুন লক্ষ্য নির্ধারণ করুন' : 'Set a Dream Goal'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+
+        {/* 6. Weekly Streak Card (Image 1 Style) */}
+        <View
+          style={[
+            styles.weeklyStreakCard,
+            {
+              backgroundColor: isDark ? 'rgba(16, 185, 129, 0.1)' : '#F0FDF4',
+              borderColor: isDark ? 'rgba(16, 185, 129, 0.25)' : '#DCFCE7',
+            },
+          ]}
+        >
+          <View style={styles.streakLeftWrap}>
+            <View style={styles.flameIconWrap}>
+              <Ionicons name="flame" size={26} color="#EA580C" />
+            </View>
+            <View style={{ marginLeft: 10 }}>
+              <Text style={[styles.streakTitle, { color: isDark ? '#F8FAFC' : '#0F172A' }]}>
+                {language === 'bn' ? 'সাপ্তাহিক স্ট্রিক' : 'Weekly Streak'}
+              </Text>
+              <Text style={[styles.streakCount, { color: isDark ? '#E2E8F0' : '#334155' }]}>
+                {dashboard.on_track_streak || 2} {language === 'bn' ? 'দিন একটানা' : 'days in a row'}
+              </Text>
+              <Text style={[styles.streakSub, { color: isDark ? '#94A3B8' : '#64748B' }]}>
+                {language === 'bn' ? 'চালিয়ে যান!' : 'Keep going!'}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.streakDaysRow}>
+            {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, idx) => {
+              const activeStreak = dashboard.on_track_streak || 2;
+              const isChecked = idx < activeStreak;
+              return (
+                <View key={idx} style={styles.streakDayNode}>
+                  <View
+                    style={[
+                      styles.streakDayDot,
+                      {
+                        backgroundColor: isChecked
+                          ? '#10B981'
+                          : (isDark ? 'rgba(255, 255, 255, 0.1)' : '#E2E8F0'),
+                      },
+                    ]}
+                  >
+                    {isChecked && <Ionicons name="checkmark" size={11} color="#FFFFFF" />}
+                  </View>
+                  <Text style={[styles.streakDayLabel, { color: isDark ? '#94A3B8' : '#64748B' }]}>
+                    {day}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+        </View>
+
+        {/* 7. Smart Tip Banner Card (Image 1 Style) */}
+        <View
+          style={[
+            styles.smartTipCard,
+            {
+              backgroundColor: isDark ? 'rgba(23, 37, 56, 0.85)' : '#F0F9FF',
+              borderColor: isDark ? 'rgba(56, 189, 248, 0.25)' : '#E0F2FE',
+            },
+          ]}
+        >
+          <View style={styles.robotAvatarWrap}>
+            <View style={[styles.robotCircle, { backgroundColor: isDark ? 'rgba(234, 88, 12, 0.2)' : '#FFEDD5' }]}>
+              <Ionicons name="headset" size={24} color="#EA580C" />
+            </View>
+          </View>
+
+          <View style={styles.smartTipTextCol}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+              <Text style={styles.smartTipHeading}>Smart Tip</Text>
+              <Ionicons name="sparkles" size={12} color="#EA580C" />
+            </View>
+            <Text style={[styles.smartTipBody, { color: isDark ? '#CBD5E1' : '#334155' }]}>
+              {language === 'bn'
+                ? `চলতি মাসে আর্থিক সুরক্ষায় আপনার দৈনিক খরচ ৳${dashboard.daily_safe_to_spend}-এর মধ্যে রাখার চেষ্টা করুন।`
+                : `Try to keep your daily spending under ৳${dashboard.daily_safe_to_spend} to stay safe this month.`}
+            </Text>
+          </View>
+        </View>
       </ScrollView>
 
       {/* Target Savings Modal */}
@@ -656,7 +771,383 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 14,
+  },
+  headerLeftBrand: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  pockitLogoImg: {
+    width: 36,
+    height: 36,
+  },
+  pockitTitleText: {
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: -0.4,
+  },
+  headerRightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  notifBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    position: 'relative',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  notifRedDot: {
+    position: 'absolute',
+    top: 9,
+    right: 10,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#EF4444',
+  },
+  greetingSection: {
     marginBottom: 16,
+  },
+  greetingMainText: {
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: -0.4,
+    marginBottom: 3,
+  },
+  greetingSubText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  heroCard: {
+    borderRadius: 22,
+    borderWidth: 1,
+    padding: 16,
+    marginBottom: 14,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 14,
+    elevation: 3,
+  },
+  heroSplit: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  heroLeftCol: {
+    flex: 1.15,
+    paddingRight: 10,
+  },
+  heroLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 6,
+  },
+  shieldIconWrap: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroColumnLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  heroAmountRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    marginBottom: 8,
+  },
+  heroCurrencySymbol: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginRight: 2,
+  },
+  heroAmountNum: {
+    fontSize: 26,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+  },
+  heroPerDay: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  onTrackPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  onTrackPillText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  heroVerticalLine: {
+    width: 1,
+    height: 90,
+    marginHorizontal: 8,
+  },
+  heroRightCol: {
+    flex: 0.95,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  riskGaugeWrap: {
+    marginVertical: 4,
+  },
+  riskTierBottomText: {
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  threeStatRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 14,
+  },
+  statCardItem: {
+    flex: 1,
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 12,
+    alignItems: 'center',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  statIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  statCardLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginBottom: 3,
+    textAlign: 'center',
+  },
+  statCardVal: {
+    fontSize: 14,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  dreamGoalCard: {
+    borderRadius: 22,
+    borderWidth: 1,
+    padding: 16,
+    marginBottom: 14,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  dreamGoalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  dreamGoalHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  targetIconBox: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dreamGoalHeaderTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  viewAllBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  viewAllText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  dreamGoalBody: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  goalThumbBox: {
+    width: 54,
+    height: 54,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  goalInfoCol: {
+    flex: 1,
+  },
+  goalItemTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  goalItemAmount: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 6,
+  },
+  goalProgressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  goalProgressTrack: {
+    flex: 1,
+    height: 6,
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  goalProgressFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  goalItemPct: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  homeBoostBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 14,
+  },
+  homeBoostBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  noGoalBody: {
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  setGoalOutlineBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  setGoalOutlineBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  weeklyStreakCard: {
+    borderRadius: 22,
+    borderWidth: 1,
+    padding: 16,
+    marginBottom: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  streakLeftWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  flameIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFEDD5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  streakTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  streakCount: {
+    fontSize: 12,
+    fontWeight: '700',
+    marginVertical: 1,
+  },
+  streakSub: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  streakDaysRow: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  streakDayNode: {
+    alignItems: 'center',
+  },
+  streakDayDot: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 3,
+  },
+  streakDayLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  smartTipCard: {
+    borderRadius: 22,
+    borderWidth: 1,
+    padding: 14,
+    marginBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  robotAvatarWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  robotCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  smartTipTextCol: {
+    flex: 1,
+  },
+  smartTipHeading: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#EA580C',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  smartTipBody: {
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '500',
+    marginTop: 2,
   },
   headerLeft: {
     flexDirection: 'row',
@@ -785,12 +1276,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
   },
-  heroLeftCol: {
+  compoundHeroLeftCol: {
     flex: 1.15,
     paddingRight: 8,
     justifyContent: 'center',
   },
-  heroRightCol: {
+  compoundHeroRightCol: {
     flex: 0.85,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1050,7 +1541,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
   },
-  viewAllBtn: {
+  recentViewAllBtn: {
     fontSize: 12,
     fontWeight: '800',
   },

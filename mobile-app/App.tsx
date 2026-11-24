@@ -387,6 +387,7 @@ function AppContent() {
             onOpenProModal={() => setProModalVisible(true)}
             onNavigateToTransactions={() => setActiveTab('ledger')}
             onNavigateToCoach={() => setActiveTab('coach')}
+            onNavigateToGoals={() => setActiveTab('goals')}
             onNavigateToProfile={() => setActiveTab('profile')}
             onToggleLanguage={toggleLanguage}
           />

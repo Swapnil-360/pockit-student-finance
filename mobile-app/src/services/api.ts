@@ -87,6 +87,7 @@ export interface UserData {
   id: string;
   email: string;
   full_name: string;
+  calling_name?: string;
   is_demo: boolean;
   is_guest?: boolean;
   is_pro?: boolean;
@@ -512,7 +513,8 @@ export async function authDemo(): Promise<AuthResponse> {
   const demoUser: UserData = {
     id: 'demo_student_001',
     email: 'demo@student.edu.bd',
-    full_name: 'Tanvir Ahmed',
+    full_name: 'Md. Miftahur Rahman Swapnil',
+    calling_name: 'Swapnil',
     avatar_url: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150&auto=format&fit=crop&q=80',
     is_demo: true,
     is_pro: true,
@@ -773,6 +775,7 @@ export async function updateUserProfile(
   userId: string,
   updates: {
     fullName?: string;
+    callingName?: string;
     avatarUrl?: string;
     universityType?: string;
     yearOfStudy?: string;
@@ -788,6 +791,7 @@ export async function updateUserProfile(
 ): Promise<{ user: UserData; profile: any }> {
   const payload: any = {};
   if (updates.fullName !== undefined) payload.full_name = updates.fullName;
+  if (updates.callingName !== undefined) payload.calling_name = updates.callingName;
   if (updates.avatarUrl !== undefined) payload.avatar_url = updates.avatarUrl;
   if (updates.universityType !== undefined) payload.university_type = updates.universityType;
   if (updates.yearOfStudy !== undefined) payload.year_of_study = updates.yearOfStudy;
@@ -821,6 +825,7 @@ export async function updateUserProfile(
   const cachedUserStr = await AsyncStorage.getItem(STORAGE_KEYS.USER);
   let cachedUser = cachedUserStr ? JSON.parse(cachedUserStr) : {};
   if (updates.fullName) cachedUser.full_name = updates.fullName;
+  if (updates.callingName !== undefined) cachedUser.calling_name = updates.callingName;
   if (updates.avatarUrl) cachedUser.avatar_url = updates.avatarUrl;
   await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(cachedUser));
   return { user: cachedUser, profile: null };
@@ -1661,6 +1666,34 @@ export async function sweepLeftoverToGoal(goalId: string, userId: string, amount
     throw new Error(err.detail || 'Failed to sweep funds');
   }
   return await res.json();
+}
+
+export async function deleteSavingsGoal(goalId: string, userId: string): Promise<any> {
+  if (userId === GUEST_USER_ID) {
+    const goalsJson = await AsyncStorage.getItem(GUEST_STORAGE_KEYS.GOALS);
+    const goals: SavingsGoal[] = goalsJson ? JSON.parse(goalsJson) : [];
+    const filtered = goals.filter((g) => g.id !== goalId);
+    await AsyncStorage.setItem(GUEST_STORAGE_KEYS.GOALS, JSON.stringify(filtered));
+    await calculateGuestDashboard();
+    return { status: 'success' };
+  }
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/goals/${goalId}?user_id=${userId}`, {
+      method: 'DELETE'
+    });
+    if (res.ok) return await res.json();
+    const err = await res.json().catch(() => ({ detail: 'Failed to delete goal' }));
+    throw new Error(err.detail || 'Failed to delete goal');
+  } catch (e: any) {
+    console.warn("deleteSavingsGoal backend notice, falling back to local storage:", e);
+    const goalsJson = await AsyncStorage.getItem(GUEST_STORAGE_KEYS.GOALS);
+    if (goalsJson) {
+      const goals: SavingsGoal[] = JSON.parse(goalsJson);
+      const filtered = goals.filter((g) => g.id !== goalId);
+      await AsyncStorage.setItem(GUEST_STORAGE_KEYS.GOALS, JSON.stringify(filtered));
+    }
+    return { status: 'success' };
+  }
 }
 
 export async function fetchStreak(userId: string): Promise<{ user_id: string; on_track_streak: number }> {

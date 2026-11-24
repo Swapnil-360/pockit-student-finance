@@ -13,6 +13,7 @@ interface SavingsGoalCardProps {
   onTogglePause: (goal: SavingsGoal) => void;
   onCreateGoal: () => void;
   onOpenSweep?: (goal: SavingsGoal) => void;
+  onDeleteGoal?: (goal: SavingsGoal) => void;
   leftoverSweepAmount?: number;
   style?: any;
 }
@@ -24,6 +25,7 @@ export const SavingsGoalCard: React.FC<SavingsGoalCardProps> = ({
   onTogglePause,
   onCreateGoal,
   onOpenSweep,
+  onDeleteGoal,
   leftoverSweepAmount = 0,
   style,
 }) => {
@@ -141,10 +143,29 @@ export const SavingsGoalCard: React.FC<SavingsGoalCardProps> = ({
           </View>
         </View>
 
-        <View style={[styles.categoryBadge, { backgroundColor: isDark ? 'rgba(83, 122, 150, 0.25)' : '#EAF2F8' }]}>
-          <Text style={[styles.categoryText, { color: theme.slateBlue }]}>
-            {goal.category || 'Gadget'}
-          </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <View style={[styles.categoryBadge, { backgroundColor: isDark ? 'rgba(83, 122, 150, 0.25)' : '#EAF2F8' }]}>
+            <Text style={[styles.categoryText, { color: theme.slateBlue }]}>
+              {goal.category || 'Gadget'}
+            </Text>
+          </View>
+          {onDeleteGoal && (
+            <TouchableOpacity
+              onPress={() => {
+                try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); } catch {}
+                onDeleteGoal(goal);
+              }}
+              style={[
+                styles.deleteGoalBtn,
+                { backgroundColor: isDark ? 'rgba(239, 68, 68, 0.15)' : '#FEF2F2' },
+              ]}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel="Delete goal"
+            >
+              <Ionicons name="trash-outline" size={15} color={isDark ? '#F87171' : '#EF4444'} />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
@@ -525,6 +546,13 @@ const styles = StyleSheet.create({
   pauseBtnText: {
     fontSize: 13,
     fontWeight: '600',
+  },
+  deleteGoalBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
 
