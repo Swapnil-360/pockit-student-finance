@@ -1,0 +1,65 @@
+{
+  "expo": {
+    "name": "Pockit",
+    "slug": "pockit",
+    "scheme": "pockit",
+    "description": "Pockit — Student Money & Financial Risk Coach",
+    "version": "2.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#172330"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.pockit.app"
+    },
+    "android": {
+      "package": "com.pockit.app",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/brand/adaptive-icon.png",
+        "backgroundColor": "#172330"
+      },
+      "permissions": [
+        "INTERNET",
+        "ACCESS_NETWORK_STATE"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "pockit",
+              "host": "auth"
+            },
+            {
+              "scheme": "takatrack",
+              "host": "auth"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-asset",
+      "expo-font",
+      "expo-secure-store",
+      "expo-web-browser"
+    ],
+    "extra": {
+      "apiUrl": "https://pockit-backend.onrender.com"
+    }
+  }
+}
