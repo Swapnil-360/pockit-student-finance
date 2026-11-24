@@ -59,7 +59,7 @@
       "expo-web-browser"
     ],
     "extra": {
-      "apiUrl": "https://pockit-backend.onrender.com"
+      "apiUrl": "https://pockit-backend-eppq.onrender.com"
     }
   }
 }

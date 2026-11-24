@@ -13,7 +13,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://pockit-backend.onrender.com",
+        "EXPO_PUBLIC_API_URL": "https://pockit-backend-eppq.onrender.com",
         "EXPO_PUBLIC_SUPABASE_URL": "https://gwxuxomnpvztfkcxdiym.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_xKydhMRwSu0SUSkJhn-DqA_7B73HSDu"
       }
@@ -23,7 +23,7 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://pockit-backend.onrender.com",
+        "EXPO_PUBLIC_API_URL": "https://pockit-backend-eppq.onrender.com",
         "EXPO_PUBLIC_SUPABASE_URL": "https://gwxuxomnpvztfkcxdiym.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_xKydhMRwSu0SUSkJhn-DqA_7B73HSDu"
       }
