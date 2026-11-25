@@ -216,20 +216,6 @@ export const ProSubscriptionModal: React.FC<ProSubscriptionModalProps> = ({
                 )}
               </LinearGradient>
             </TouchableOpacity>
-
-            {/* Instant Demo Pro Toggle for Testers */}
-            <TouchableOpacity
-              style={styles.demoProBtn}
-              onPress={handleDemoProToggle}
-              disabled={demoLoading}
-              activeOpacity={0.8}
-            >
-              {demoLoading ? (
-                <ActivityIndicator color={THEME.colors.primaryLight} size="small" />
-              ) : (
-                <Text style={styles.demoProBtnText}>{t.demoProBtn}</Text>
-              )}
-            </TouchableOpacity>
           </ScrollView>
         </View>
       </KeyboardAvoidingView>

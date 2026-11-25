@@ -31,9 +31,7 @@ export const BRANDING = {
     wallet: require('../../assets/brand/pockit_wallet.png'),
     headerLogo: require('../../assets/brand/pockit_header_logo.png'),
     headerLogoDark: require('../../assets/brand/pockit_header_logo_dark.png'),
-    splashIcon: require('../../assets/brand/splash-icon.png'),
     adaptiveIcon: require('../../assets/brand/adaptive-icon.png'),
-    splashMascot: require('../../assets/logo/file_0000000001588211a3990faca79abdd6.png'),
   },
 
   // Brand Palette Accents

@@ -112,7 +112,7 @@ export const GoalsScreen: React.FC<GoalsScreenProps> = ({
               const updated = await boostSavingsGoal(goal.id, userId, amount);
               handleGoalUpdated(updated);
               Alert.alert(
-                language === 'bn' ? 'সফল!' : 'Saved for Target! 🎉',
+                language === 'bn' ? 'সফল!' : 'Saved for Target!',
                 language === 'bn'
                   ? `৳${amount.toLocaleString()} সফলভাবে জমা হয়েছে এবং প্রগ্রেস বার আপডেট হয়েছে!`
                   : `৳${amount.toLocaleString()} has been added to your goal! Your progress bar is updated.`

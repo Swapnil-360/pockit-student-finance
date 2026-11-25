@@ -33,6 +33,8 @@ import {
   logoutUser,
   fetchSubscriptionStatus,
   deleteAccountApi,
+  fetchStreak,
+  fetchStreakLeaderboard,
   UserData,
 } from '../services/api';
 import { scheduleDailySpendingReminder } from '../services/notifications';
@@ -42,6 +44,7 @@ import { getCallingName, suggestCallingNames } from '../utils/nameHelper';
 interface ProfileScreenProps {
   user: UserData;
   language: Language;
+  initialStreak?: number;
   onToggleLanguage: () => void;
   onLogout: () => void;
   onOpenProModal: () => void;
@@ -61,6 +64,7 @@ const AVATAR_PRESETS = [
 export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   user,
   language,
+  initialStreak,
   onToggleLanguage,
   onLogout,
   onOpenProModal,
@@ -76,6 +80,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     is_pro: Boolean(user.is_pro),
     tier: user.is_pro ? 'pro' : 'free',
   });
+  const [myStreak, setMyStreak] = useState<number>(initialStreak ?? 0);
+  const [myStreakRank, setMyStreakRank] = useState<number | null>(null);
 
   // Edit Profile Modal State
   const [editModalVisible, setEditModalVisible] = useState(false);
@@ -117,7 +123,32 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   useEffect(() => {
     loadProfile();
     loadSubscription();
+    loadStreakStats();
   }, [user.id]);
+
+  useEffect(() => {
+    if (typeof initialStreak === 'number' && initialStreak > 0) {
+      setMyStreak((prev) => Math.max(prev, initialStreak));
+    }
+  }, [initialStreak]);
+
+  const loadStreakStats = async () => {
+    fetchStreak(user.id)
+      .then((s) => {
+        const resolved = s.current_streak ?? s.on_track_streak ?? initialStreak ?? 0;
+        if (resolved > 0) setMyStreak(resolved);
+      })
+      .catch(() => {});
+
+    fetchStreakLeaderboard(user.id)
+      .then((lb) => {
+        setMyStreakRank(lb.my_rank ?? null);
+        if (lb.my_streak && lb.my_streak > 0) {
+          setMyStreak((prev) => Math.max(prev, lb.my_streak));
+        }
+      })
+      .catch(() => {});
+  };
 
   useEffect(() => {
     setCurrentUser(user);
@@ -536,6 +567,24 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                   </TouchableOpacity>
                 )}
 
+                <View
+                  style={[
+                    styles.freeBadge,
+                    {
+                      backgroundColor: isDark ? 'rgba(16, 185, 129, 0.14)' : '#ECFDF5',
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 4,
+                    },
+                  ]}
+                >
+                  <Ionicons name="flame" size={11} color="#EA580C" />
+                  <Text style={[styles.freeBadgeText, { color: '#059669' }]}>
+                    {myStreak} {language === 'bn' ? 'দিন স্ট্রিক' : 'd Streak'}
+                    {myStreakRank ? ` • #${myStreakRank}` : ''}
+                  </Text>
+                </View>
+
                 <TouchableOpacity
                   style={[styles.editPill, { borderColor: theme.border }]}
                   onPress={() => setEditModalVisible(true)}
@@ -855,11 +904,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
               <Text style={[styles.metaLabel, { color: theme.textSecondary }]}>{t.whereYouLive}</Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 0 }}>
                 <Text style={[styles.metaVal, { color: theme.primary, fontWeight: '800' }]}>
-                  {profile?.where_you_live === 'With family' ? (language === 'bn' ? '🏠 পরিবারের সাথে' : '🏠 With family') :
-                   profile?.where_you_live === 'Mess-hostel' ? (language === 'bn' ? '🏢 মেস / হোস্টেল' : '🏢 Mess / Hostel') :
-                   profile?.where_you_live === 'Rented flat' ? (language === 'bn' ? '🔑 ভাড়া ফ্ল্যাট' : '🔑 Rented flat') :
-                   profile?.where_you_live === 'Hall' ? (language === 'bn' ? '🏛️ হল' : '🏛️ Univ Hall') :
-                   (profile?.where_you_live || (language === 'bn' ? '🏠 পরিবারের সাথে' : 'With family'))}
+                  {profile?.where_you_live === 'With family' ? (language === 'bn' ? 'পরিবারের সাথে' : 'With family') :
+                   profile?.where_you_live === 'Mess-hostel' ? (language === 'bn' ? 'মেস / হোস্টেল' : 'Mess / Hostel') :
+                   profile?.where_you_live === 'Rented flat' ? (language === 'bn' ? 'ভাড়া ফ্ল্যাট' : 'Rented flat') :
+                   profile?.where_you_live === 'Hall' ? (language === 'bn' ? 'হল' : 'Univ Hall') :
+                   (profile?.where_you_live || (language === 'bn' ? 'পরিবারের সাথে' : 'With family'))}
                 </Text>
                 <Ionicons name="chevron-forward" size={13} color={theme.textMuted} />
               </View>
@@ -1342,10 +1391,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
               </Text>
               <View style={styles.chipRow}>
                 {[
-                  { key: 'With family', en: '🏠 With Family', bn: '🏠 পরিবার' },
-                  { key: 'Mess-hostel', en: '🏢 Mess / Hostel', bn: '🏢 মেস' },
-                  { key: 'Rented flat', en: '🔑 Rented Flat', bn: '🔑 ফ্ল্যাট' },
-                  { key: 'Hall', en: '🏛️ University Hall', bn: '🏛️ হল' },
+                  { key: 'With family', en: 'With Family', bn: 'পরিবার' },
+                  { key: 'Mess-hostel', en: 'Mess / Hostel', bn: 'মেস' },
+                  { key: 'Rented flat', en: 'Rented Flat', bn: 'ফ্ল্যাট' },
+                  { key: 'Hall', en: 'University Hall', bn: 'হল' },
                 ].map((item) => (
                   <TouchableOpacity
                     key={item.key}
@@ -1578,8 +1627,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 <View style={{ padding: 11, borderRadius: 12, backgroundColor: isDark ? 'rgba(255, 255, 255, 0.03)' : '#F1F5F9', marginBottom: 14 }}>
                   <Text style={{ fontSize: 11.5, color: theme.textSecondary, lineHeight: 16 }}>
                     {language === 'bn'
-                      ? '💡 মেস মিল বন্ধ থাকলে খাবার খরচ অগ্রিম জমা হিসেবে আলাদা আটকানো হয় না। আপনার খাবারের খরচ স্বাভাবিক দৈনিক খরচ হিসেবে হাতখরচ থেকে হিসাব হবে।'
-                      : '💡 When Mess Meals are OFF, food costs are not ring-fenced upfront. Meals are tracked as normal daily food expenses from your daily pocket money.'}
+                      ? 'মেস মিল বন্ধ থাকলে খাবার খরচ অগ্রিম জমা হিসেবে আলাদা আটকানো হয় না। আপনার খাবারের খরচ স্বাভাবিক দৈনিক খরচ হিসেবে হাতখরচ থেকে হিসাব হবে।'
+                      : 'When Mess Meals are OFF, food costs are not ring-fenced upfront. Meals are tracked as normal daily food expenses from your daily pocket money.'}
                   </Text>
                 </View>
               )}
@@ -1648,7 +1697,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 return (
                   <View style={{ backgroundColor: 'rgba(244, 123, 78, 0.1)', padding: 14, borderRadius: 14, borderWidth: 1.5, borderColor: 'rgba(244, 123, 78, 0.35)', marginBottom: 16 }}>
                     <Text style={{ fontSize: 13, fontWeight: '800', color: theme.textPrimary, marginBottom: 6 }}>
-                      {language === 'bn' ? '💡 লাইভ দৈনিক সীমার পূর্বাভাস' : '💡 Live Safe Spend Projection'}
+                      {language === 'bn' ? 'লাইভ দৈনিক সীমার পূর্বাভাস' : 'Live Safe Spend Projection'}
                     </Text>
                     <Text style={{ fontSize: 12, color: theme.textSecondary }}>
                       {language === 'bn'
@@ -1660,8 +1709,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         <Ionicons name="flash" size={16} color="#F47B4E" />
                         <Text style={{ fontSize: 15, fontWeight: '800', color: '#F47B4E' }}>
                           {language === 'bn'
-                            ? `👉 বাকি ${daysRemaining} দিনের বরাদ্দ: ৳ ${dailyPaced} / দিন`
-                            : `👉 Remaining ${daysRemaining} days limit: ৳ ${dailyPaced} / day`}
+                            ? `বাকি ${daysRemaining} দিনের বরাদ্দ: ৳ ${dailyPaced} / দিন`
+                            : `Remaining ${daysRemaining} days limit: ৳ ${dailyPaced} / day`}
                         </Text>
                       </View>
                       <Text style={{ fontSize: 11, color: theme.textMuted, marginLeft: 22 }}>
@@ -1728,10 +1777,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
               </Text>
               <View style={styles.chipRow}>
                 {[
-                  { key: 'With family', en: '🏠 With Family', bn: '🏠 পরিবারের সাথে' },
-                  { key: 'Mess-hostel', en: '🏢 Mess / Hostel', bn: '🏢 মেস / হোস্টেল' },
-                  { key: 'Rented flat', en: '🔑 Rented Flat', bn: '🔑 ভাড়া ফ্ল্যাট' },
-                  { key: 'Hall', en: '🏛️ University Hall', bn: '🏛️ হল' },
+                  { key: 'With family', en: 'With Family', bn: 'পরিবারের সাথে' },
+                  { key: 'Mess-hostel', en: 'Mess / Hostel', bn: 'মেস / হোস্টেল' },
+                  { key: 'Rented flat', en: 'Rented Flat', bn: 'ভাড়া ফ্ল্যাট' },
+                  { key: 'Hall', en: 'University Hall', bn: 'হল' },
                 ].map((item) => {
                   const isSelected = editLiving === item.key;
                   return (

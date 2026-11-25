@@ -84,11 +84,37 @@ export const MessMealTrackerModal: React.FC<MessMealTrackerModalProps> = ({
     }
   }, [visible]);
 
+  const applyOptimisticSummary = (patch: Partial<MessSummary>) => {
+    setSummary((prev) => {
+      if (!prev) return prev;
+      const next = { ...prev, ...patch };
+      const totalMeals = Number(next.total_meals || 0);
+      const rate = Number(next.estimated_meal_rate || 50);
+      const advance = Number(next.meal_advance_paid || 0);
+      const consumed = Number((totalMeals * rate).toFixed(2));
+      const diff = Number((advance - consumed).toFixed(2));
+      return {
+        ...next,
+        consumed_food_cost: consumed,
+        balance_status: diff >= 0 ? 'surplus' : 'deficit',
+        balance_amount: Math.abs(diff),
+      };
+    });
+  };
+
   const handleLogMeal = async (count: number) => {
     try {
       Haptics.selectionAsync();
     } catch {}
     setSelectedCount(count);
+    if (summary) {
+      const prevCount = summary.meals_by_date?.[todayStr] ?? 0;
+      const nextMeals = Math.max(0, Number((summary.total_meals - prevCount + count).toFixed(2)));
+      applyOptimisticSummary({
+        total_meals: nextMeals,
+        meals_by_date: { ...(summary.meals_by_date || {}), [todayStr]: count },
+      });
+    }
     try {
       await logMessMeal({
         user_id: userId,
@@ -101,6 +127,7 @@ export const MessMealTrackerModal: React.FC<MessMealTrackerModalProps> = ({
       await loadSummary();
       if (onSuccess) onSuccess();
     } catch (e: any) {
+      await loadSummary();
       Alert.alert('Error', e.message);
     }
   };
@@ -108,12 +135,14 @@ export const MessMealTrackerModal: React.FC<MessMealTrackerModalProps> = ({
   const handleSaveRate = async () => {
     const rateNum = parseFloat(newRate);
     if (isNaN(rateNum) || rateNum <= 0) return;
+    setEditRateMode(false);
+    applyOptimisticSummary({ estimated_meal_rate: rateNum });
     try {
       await updateEstimatedMealRate({ user_id: userId, estimated_meal_rate: rateNum });
-      setEditRateMode(false);
       await loadSummary();
       if (onSuccess) onSuccess();
     } catch (e: any) {
+      await loadSummary();
       if (Platform.OS === 'web' && typeof window !== 'undefined') {
         window.alert(e.message || 'Failed to update meal rate');
       } else {
@@ -125,13 +154,19 @@ export const MessMealTrackerModal: React.FC<MessMealTrackerModalProps> = ({
   const handleSaveTotalMeals = async () => {
     const mealsNum = parseFloat(newMeals);
     if (isNaN(mealsNum) || mealsNum < 0) return;
+    setEditMealsMode(false);
+    applyOptimisticSummary({ total_meals: mealsNum });
     try {
       try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
-      await updateMessTotalMeals({ user_id: userId, total_meals: mealsNum });
-      setEditMealsMode(false);
-      await loadSummary();
+      const updated = await updateMessTotalMeals({ user_id: userId, total_meals: mealsNum });
+      if (updated && typeof updated.total_meals === 'number') {
+        setSummary(updated);
+      } else {
+        await loadSummary();
+      }
       if (onSuccess) onSuccess();
     } catch (e: any) {
+      await loadSummary();
       if (Platform.OS === 'web' && typeof window !== 'undefined') {
         window.alert(e.message || 'Failed to update total meals');
       } else {
@@ -143,13 +178,15 @@ export const MessMealTrackerModal: React.FC<MessMealTrackerModalProps> = ({
   const handleSaveAdvance = async () => {
     const advNum = parseFloat(newAdvance);
     if (isNaN(advNum) || advNum < 0) return;
+    setEditAdvanceMode(false);
+    applyOptimisticSummary({ meal_advance_paid: advNum });
     try {
       try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
       await updateMessAdvance({ user_id: userId, meal_advance_paid: advNum });
-      setEditAdvanceMode(false);
       await loadSummary();
       if (onSuccess) onSuccess();
     } catch (e: any) {
+      await loadSummary();
       if (Platform.OS === 'web' && typeof window !== 'undefined') {
         window.alert(e.message || 'Failed to update mess advance');
       } else {
@@ -161,11 +198,13 @@ export const MessMealTrackerModal: React.FC<MessMealTrackerModalProps> = ({
   const handleToggleSystem = async (val: boolean) => {
     try { Haptics.selectionAsync(); } catch {}
     setTogglingSystem(true);
+    applyOptimisticSummary({ enable_mess_meals: val });
     try {
       await toggleMessMealSystem(userId, val);
       await loadSummary();
       if (onSuccess) onSuccess();
     } catch (e: any) {
+      await loadSummary();
       if (Platform.OS === 'web' && typeof window !== 'undefined') {
         window.alert(e.message || 'Failed to toggle mess meal system');
       } else {
@@ -548,7 +587,7 @@ export const MessMealTrackerModal: React.FC<MessMealTrackerModalProps> = ({
                     <Ionicons name="calculator-outline" size={16} color={theme.primary} />
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.midMonthTipTitle, { color: theme.primary }]}>
-                        {language === 'bn' ? 'মাসের মাঝামাঝি শুরু করেছেন? মিল সমন্বয় করুন ✎' : 'Started mid-month? Tap to input/adjust total meals ✎'}
+                        {language === 'bn' ? 'মাসের মাঝামাঝি শুরু করেছেন? মিল সমন্বয় করুন' : 'Started mid-month? Tap to adjust total meals'}
                       </Text>
                       <Text style={[styles.midMonthTipText, { color: theme.textSecondary }]}>
                         {language === 'bn'

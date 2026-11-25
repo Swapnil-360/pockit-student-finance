@@ -9,7 +9,6 @@ import {
   Image,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TRANSLATIONS, Language } from '../constants/translations';
 import { BRANDING } from '../constants/branding';
@@ -164,83 +163,66 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ language, onFinish }
     >
       <StatusBar style="dark" />
 
-      {/* Modern Ambient Glow Shapes (Mirrors the clean, warm home screen aesthetic) */}
-      <View style={styles.ambientBlobTopRight} pointerEvents="none" />
-      <View style={styles.ambientBlobBottomLeft} pointerEvents="none" />
+      {/* Subtle Warm Ambient Aura */}
+      <View style={styles.ambientGlowTop} pointerEvents="none" />
+      <View style={styles.ambientGlowBottom} pointerEvents="none" />
 
-      {/* Top Header Badge */}
-      <View style={[styles.topSection, { paddingTop: Math.max(insets.top, 24) + 12 }]}>
-        <View style={styles.systemBadge}>
-          <View style={styles.statusPulseDot} />
-          <Text style={styles.systemBadgeText}>
-            {language === 'bn' ? 'স্মার্ট ফিনান্সিয়াল সিস্টেম' : 'Student Financial Intelligence'}
-          </Text>
-        </View>
-      </View>
-
-      {/* Center Unified Hero Card */}
+      {/* Center Brand Hero Lockup */}
       <Animated.View
         style={[
           styles.centerSection,
           {
+            paddingTop: Math.max(insets.top, 24),
             opacity: fadeAnim,
             transform: [{ scale: scaleAnim }],
           },
         ]}
       >
-        <View style={styles.heroCard}>
-          {/* Logo with gentle pulse */}
-          <Animated.View
-            style={[
-              styles.logoWrapper,
-              {
-                transform: [{ scale: pulseAnim }],
-              },
-            ]}
-          >
-            <Image
-              source={BRANDING.assets.splashMascot || require('../../assets/logo/file_0000000001588211a3990faca79abdd6.png')}
-              style={styles.logoImage}
-              resizeMode="contain"
-            />
-          </Animated.View>
+        <Animated.View
+          style={[
+            styles.logoWrapper,
+            {
+              transform: [{ scale: pulseAnim }],
+            },
+          ]}
+        >
+          <Image
+            source={BRANDING.assets.headerLogo}
+            style={styles.logoImage}
+            resizeMode="contain"
+          />
+        </Animated.View>
 
-          {/* Unified Taglines */}
-          <View style={styles.taglineBlock}>
-            <Text style={styles.taglineEn}>{BRANDING.taglineEn}</Text>
-            <View style={styles.taglineBnPill}>
-              <Text style={styles.taglineBn}>{BRANDING.taglineBn}</Text>
-            </View>
-          </View>
+        <View style={styles.accentDivider} />
 
-          {/* Integrated Sleek Loading Track */}
-          <View style={styles.loadingBlock}>
-            <View style={styles.progressBarTrack}>
-              <Animated.View
-                style={[
-                  styles.progressBarFill,
-                  {
-                    width: progressWidth,
-                  },
-                ]}
-              />
-            </View>
-            <View style={styles.statusRow}>
-              <Ionicons name="sparkles" size={12} color="#EA580C" style={{ marginRight: 6 }} />
-              <Text style={styles.loadingText}>
-                {language === 'bn' ? 'নিরাপদ লেজার লোড হচ্ছে...' : 'Initializing secure ledger...'}
-              </Text>
-            </View>
-          </View>
+        <View style={styles.taglineBlock}>
+          <Text style={styles.taglineEn}>{BRANDING.taglineEn}</Text>
+          <Text style={styles.taglineBn}>{BRANDING.taglineBn}</Text>
         </View>
       </Animated.View>
 
-      {/* Bottom Security Trust Badge */}
-      <View style={[styles.bottomSection, { paddingBottom: Math.max(insets.bottom, 16) + 16 }]}>
-        <View style={styles.trustPill}>
-          <Ionicons name="shield-checkmark" size={13} color="#10B981" />
-          <Text style={styles.trustText}>
-            256-Bit Bank Encryption • Hybrid ML v2.0
+      {/* Sleek Loading & Student Financial Footer */}
+      <View style={[styles.bottomSection, { paddingBottom: Math.max(insets.bottom, 20) + 20 }]}>
+        <View style={styles.loadingBlock}>
+          <View style={styles.progressBarTrack}>
+            <Animated.View
+              style={[
+                styles.progressBarFill,
+                {
+                  width: progressWidth,
+                },
+              ]}
+            />
+          </View>
+          <Text style={styles.loadingText}>
+            {language === 'bn' ? 'লোড হচ্ছে...' : 'Loading...'}
+          </Text>
+        </View>
+
+        <View style={styles.brandFooterRow}>
+          <View style={styles.brandFooterDot} />
+          <Text style={styles.brandFooterText}>
+            {language === 'bn' ? 'স্টুডেন্ট ফিনান্সিয়াল' : 'STUDENT FINANCIAL'}
           </Text>
         </View>
       </View>
@@ -251,138 +233,89 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ language, onFinish }
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#FFFFFF',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: 28,
     position: 'relative',
     overflow: 'hidden',
   },
-  // Ambient background gradients
-  ambientBlobTopRight: {
+  ambientGlowTop: {
     position: 'absolute',
-    top: -40,
-    right: -40,
-    width: 220,
-    height: 220,
-    borderRadius: 110,
-    backgroundColor: '#FFEDD5',
-    opacity: 0.65,
+    top: -120,
+    right: -100,
+    width: 340,
+    height: 340,
+    borderRadius: 170,
+    backgroundColor: 'rgba(244, 123, 78, 0.06)',
   },
-  ambientBlobBottomLeft: {
+  ambientGlowBottom: {
     position: 'absolute',
-    bottom: -60,
-    left: -60,
-    width: 240,
-    height: 240,
-    borderRadius: 120,
-    backgroundColor: '#FFF7ED',
-    opacity: 0.7,
-  },
-  topSection: {
-    alignItems: 'center',
-    width: '100%',
-  },
-  systemBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    shadowColor: '#64748B',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
-  },
-  statusPulseDot: {
-    width: 6.5,
-    height: 6.5,
-    borderRadius: 3.5,
-    backgroundColor: '#10B981',
-    marginRight: 7,
-  },
-  systemBadgeText: {
-    fontSize: 11.5,
-    fontWeight: '600',
-    color: '#475569',
-    letterSpacing: 0.2,
+    bottom: -140,
+    left: -120,
+    width: 360,
+    height: 360,
+    borderRadius: 180,
+    backgroundColor: 'rgba(90, 130, 150, 0.05)',
   },
   centerSection: {
+    flex: 1,
     width: '100%',
-    maxWidth: 380,
+    maxWidth: 360,
     alignItems: 'center',
     justifyContent: 'center',
-    marginVertical: 'auto',
-  },
-  heroCard: {
-    width: '100%',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 26,
-    paddingHorizontal: 22,
-    paddingVertical: 26,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#EEF2F6',
-    shadowColor: '#334155',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.08,
-    shadowRadius: 20,
-    elevation: 4,
   },
   logoWrapper: {
-    width: '100%',
-    height: 120,
+    width: 232,
+    height: 90,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 6,
   },
   logoImage: {
     width: '100%',
     height: '100%',
   },
+  accentDivider: {
+    width: 34,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: '#F47B4E',
+    opacity: 0.8,
+    marginTop: 22,
+    marginBottom: 18,
+  },
   taglineBlock: {
     alignItems: 'center',
     width: '100%',
-    marginTop: 4,
-    marginBottom: 20,
+    paddingHorizontal: 8,
   },
   taglineEn: {
-    fontSize: 14.5,
-    lineHeight: 21,
+    fontSize: 15.5,
+    lineHeight: 22,
     color: '#0F172A',
-    fontWeight: '700',
+    fontWeight: '600',
     textAlign: 'center',
     letterSpacing: -0.2,
   },
-  taglineBnPill: {
-    backgroundColor: '#FFF7ED',
-    borderWidth: 1,
-    borderColor: '#FFEDD5',
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 4.5,
-    marginTop: 8,
-  },
   taglineBn: {
-    fontSize: 12.5,
-    lineHeight: 18,
-    color: '#EA580C',
-    fontWeight: '600',
+    fontSize: 13,
+    lineHeight: 20,
+    color: '#64748B',
+    fontWeight: '500',
     textAlign: 'center',
+    marginTop: 6,
+  },
+  bottomSection: {
+    width: '100%',
+    alignItems: 'center',
   },
   loadingBlock: {
     width: '100%',
     alignItems: 'center',
-    paddingTop: 4,
   },
   progressBarTrack: {
-    width: '100%',
-    maxWidth: 240,
-    height: 6,
+    width: 196,
+    height: 4.5,
     borderRadius: 3,
     backgroundColor: '#F1F5F9',
     overflow: 'hidden',
@@ -390,43 +323,32 @@ const styles = StyleSheet.create({
   progressBarFill: {
     height: '100%',
     borderRadius: 3,
-    backgroundColor: '#EA580C',
-  },
-  statusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 10,
+    backgroundColor: '#F47B4E',
   },
   loadingText: {
-    fontSize: 12,
+    fontSize: 12.5,
     color: '#64748B',
     fontWeight: '500',
-    letterSpacing: 0.1,
+    letterSpacing: 0.3,
+    marginTop: 10,
   },
-  bottomSection: {
-    alignItems: 'center',
-    width: '100%',
-  },
-  trustPill: {
+  brandFooterRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 5.5,
+    marginTop: 28,
     gap: 6,
-    shadowColor: '#64748B',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 3,
-    elevation: 1,
   },
-  trustText: {
+  brandFooterDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: '#F47B4E',
+    opacity: 0.85,
+  },
+  brandFooterText: {
     fontSize: 11,
-    color: '#64748B',
-    fontWeight: '500',
-    letterSpacing: 0.2,
+    color: '#94A3B8',
+    fontWeight: '600',
+    letterSpacing: 1.5,
   },
 });

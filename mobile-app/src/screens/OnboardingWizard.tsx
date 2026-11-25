@@ -370,10 +370,10 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
               </View>
               <View style={styles.chipGrid}>
                 {[
-                  { key: 'With family', en: '🏠 With Family', bn: '🏠 পরিবারের সাথে' },
-                  { key: 'Mess-hostel', en: '🏢 Mess / Hostel', bn: '🏢 মেস / হোস্টেল' },
-                  { key: 'Hall', en: '🏛️ University Hall', bn: '🏛️ হল' },
-                  { key: 'Rented flat', en: '🔑 Rented Flat', bn: '🔑 ভাড়া বাসা' },
+                  { key: 'With family', en: 'With Family', bn: 'পরিবারের সাথে' },
+                  { key: 'Mess-hostel', en: 'Mess / Hostel', bn: 'মেস / হোস্টেল' },
+                  { key: 'Hall', en: 'University Hall', bn: 'হল' },
+                  { key: 'Rented flat', en: 'Rented Flat', bn: 'ভাড়া বাসা' },
                 ].map((item) => (
                   <ChoiceChip
                     key={item.key}
@@ -591,7 +591,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
               <View style={styles.mathHeaderRow}>
                 <Ionicons name="calculator-outline" size={20} color="#F47B4E" />
                 <Text style={[styles.mathHeaderTitle, { color: theme.textPrimary }]}>
-                  {language === 'bn' ? '💡 লাইভ পকেট ফর্মুলা হিসাব' : '💡 Live Safe Spend Calculation'}
+                  {language === 'bn' ? 'লাইভ পকেট ফর্মুলা হিসাব' : 'Live Safe Spend Calculation'}
                 </Text>
               </View>
 
@@ -607,7 +607,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
               {monthlyRentFixed > 0 && (
                 <View style={styles.mathRow}>
                   <Text style={[styles.mathLabel, { color: theme.textSecondary }]}>
-                    {language === 'bn' ? '− মেস/সিট ভাড়া (সুরক্ষিত 🔒)' : '− Fixed Rent (Locked 🔒)'}
+                    {language === 'bn' ? '− মেস/সিট ভাড়া (সুরক্ষিত)' : '− Fixed Rent (Locked)'}
                   </Text>
                   <Text style={[styles.mathValNegative, { color: '#F43F5E' }]}>
                     − ৳ {monthlyRentFixed.toLocaleString()}
@@ -618,7 +618,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
               {messMealFixed > 0 && (
                 <View style={styles.mathRow}>
                   <Text style={[styles.mathLabel, { color: theme.textSecondary }]}>
-                    {language === 'bn' ? '− মেস মিল খাবার (সুরক্ষিত 🍲)' : '− Mess Meals (Locked 🍲)'}
+                    {language === 'bn' ? '− মেস মিল খাবার (সুরক্ষিত)' : '− Mess Meals (Locked)'}
                   </Text>
                   <Text style={[styles.mathValNegative, { color: '#F43F5E' }]}>
                     − ৳ {messMealFixed.toLocaleString()}
@@ -629,7 +629,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
               {academicFeeFixed > 0 && (
                 <View style={styles.mathRow}>
                   <Text style={[styles.mathLabel, { color: theme.textSecondary }]}>
-                    {language === 'bn' ? '− সেমিস্টার ফি কিস্তি (সংরক্ষিত 🎓)' : '− Semester Fee (Reserved 🎓)'}
+                    {language === 'bn' ? '− সেমিস্টার ফি কিস্তি (সংরক্ষিত)' : '− Semester Fee (Reserved)'}
                   </Text>
                   <Text style={[styles.mathValNegative, { color: '#F43F5E' }]}>
                     − ৳ {academicFeeFixed.toLocaleString()}
@@ -640,7 +640,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
               {savingsGoalFixed > 0 && (
                 <View style={styles.mathRow}>
                   <Text style={[styles.mathLabel, { color: theme.textSecondary }]}>
-                    {language === 'bn' ? '− মাসিক সঞ্চয় (সুরক্ষিত 🛡️)' : '− Target Savings (Shield 🛡️)'}
+                    {language === 'bn' ? '− মাসিক সঞ্চয় (সুরক্ষিত)' : '− Target Savings (Protected)'}
                   </Text>
                   <Text style={[styles.mathValNegative, { color: '#F59E0B' }]}>
                     − ৳ {savingsGoalFixed.toLocaleString()}
@@ -663,8 +663,8 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                 <Ionicons name="flash" size={16} color="#F47B4E" />
                 <Text style={styles.safeDailyBannerText}>
                   {language === 'bn'
-                    ? `👉 দৈনিক নিরাপদ সীমা: ৳ ${dailySafeSpend} / দিন (৩০ দিন)`
-                    : `👉 Safe Daily Spending Limit: ৳ ${dailySafeSpend} / day`}
+                    ? `দৈনিক নিরাপদ সীমা: ৳ ${dailySafeSpend} / দিন (৩০ দিন)`
+                    : `Safe Daily Spending Limit: ৳ ${dailySafeSpend} / day`}
                 </Text>
               </View>
             </LinearGradient>

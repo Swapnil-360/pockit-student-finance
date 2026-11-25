@@ -221,6 +221,13 @@ def test_full_pipeline():
     print("ALL 10 BACKEND INTEGRATION TESTS PASSED 100%!")
     print("==========================================\n")
 
+    # Clean up temporary test user so Admin Panel & Supabase stay clean
+    try:
+        from database import db
+        db.delete_user(user_id)
+    except Exception:
+        pass
+
 
 if __name__ == "__main__":
     test_full_pipeline()

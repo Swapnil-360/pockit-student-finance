@@ -314,20 +314,6 @@ export const AiCoachScreen: React.FC<AiCoachScreenProps> = ({
                   {t.proUpgradeBtn}
                 </Text>
               </TouchableOpacity>
-
-              {/* Demo Activation */}
-              <TouchableOpacity
-                style={[styles.demoUnlockBtn, { backgroundColor: isDark ? '#16191D' : '#EDF4F9', borderColor: theme.borderMedium }]}
-                onPress={handleDemoUnlock}
-                disabled={demoLoading}
-                activeOpacity={0.8}
-              >
-                {demoLoading ? (
-                  <ActivityIndicator size="small" color={theme.textPrimary} />
-                ) : (
-                  <Text style={[styles.demoUnlockBtnText, { color: theme.textPrimary }]}>{t.demoProBtn}</Text>
-                )}
-              </TouchableOpacity>
             </View>
 
             {/* Teaser Preview Card */}

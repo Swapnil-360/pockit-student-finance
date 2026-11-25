@@ -4,7 +4,14 @@ import Constants from 'expo-constants';
 import { saveAuthToken, clearAuthToken } from './security';
 
 const getInitialBaseUrl = (): string => {
-  // 1. Explicit public env variable configured during EAS build or in .env
+  // 1. Local browser dev server -> always talk to local FastAPI backend on port 8000
+  if (typeof window !== 'undefined' && window.location?.hostname) {
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      return `http://${window.location.hostname}:8000`;
+    }
+  }
+
+  // 2. Explicit public env variable configured during EAS build or in .env
   if (process.env.EXPO_PUBLIC_API_URL) {
     return process.env.EXPO_PUBLIC_API_URL.replace(/\/+$/, '');
   }
@@ -223,6 +230,31 @@ export interface SavingsGoal {
   required_monthly_savings?: number;
 }
 
+export interface StreakDayItem {
+  day_label: string;
+  date: string;
+  status: 'completed' | 'missed' | 'today' | 'upcoming';
+}
+
+export interface StreakSummary {
+  user_id: string;
+  current_streak: number;
+  longest_streak: number;
+  last_streak_date?: string | null;
+  checked_in_today: boolean;
+  week_days: StreakDayItem[];
+  monthly_completed_days: number;
+  monthly_total_days: number;
+  monthly_target_days: number;
+  monthly_pct: number;
+  monthly_80_unlocked: boolean;
+  reward_spots_total: number;
+  reward_spots_claimed: number;
+  reward_spots_remaining: number;
+  user_30_day_rank?: number | null;
+  reward_unlocked: boolean;
+}
+
 export interface DashboardData {
   user_id: string;
   month: string;
@@ -261,6 +293,7 @@ export interface DashboardData {
   // Dream Goal Vault & Streak
   active_goal?: SavingsGoal;
   on_track_streak?: number;
+  streak_summary?: StreakSummary;
   enable_mess_meals?: boolean;
 }
 
@@ -1766,16 +1799,137 @@ export async function deleteSavingsGoal(goalId: string, userId: string): Promise
   }
 }
 
-export async function fetchStreak(userId: string): Promise<{ user_id: string; on_track_streak: number }> {
+export async function fetchStreak(userId: string): Promise<StreakSummary & { on_track_streak: number }> {
+  const cacheKey = `@pockit_streak_${userId}`;
   try {
-    const res = await fetch(`${API_BASE_URL}/api/streak/${userId}`);
+    const res = await fetchWithTimeout(`${API_BASE_URL}/api/streak/${userId}`, {}, 25000);
     if (res.ok) {
-      return await res.json();
+      const data = await res.json();
+      if (data && typeof data === 'object') {
+        const resolved = data.current_streak ?? data.on_track_streak ?? 1;
+        data.current_streak = resolved;
+        data.on_track_streak = data.on_track_streak ?? resolved;
+      }
+      await AsyncStorage.setItem(cacheKey, JSON.stringify(data));
+      return data;
     }
   } catch (e) {
     console.warn("API offline fallback for streak:", e);
   }
-  return { user_id: userId, on_track_streak: 5 };
+  try {
+    const cached = await AsyncStorage.getItem(cacheKey);
+    if (cached) return JSON.parse(cached);
+  } catch {}
+  const now = new Date();
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const labels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+  const dow = now.getDay();
+  const weekDays: StreakDayItem[] = labels.map((lbl, idx) => {
+    const d = new Date(now);
+    d.setDate(now.getDate() - (dow - idx));
+    return {
+      day_label: lbl,
+      date: d.toISOString().substring(0, 10),
+      status: idx === dow ? 'completed' : idx < dow ? 'missed' : 'upcoming',
+    };
+  });
+  return {
+    user_id: userId,
+    on_track_streak: 1,
+    current_streak: 1,
+    longest_streak: 1,
+    checked_in_today: true,
+    week_days: weekDays,
+    monthly_completed_days: 1,
+    monthly_total_days: daysInMonth,
+    monthly_target_days: Math.ceil(daysInMonth * 0.8),
+    monthly_pct: Number(((1 / daysInMonth) * 100).toFixed(1)),
+    monthly_80_unlocked: false,
+    reward_spots_total: 100,
+    reward_spots_claimed: 0,
+    reward_spots_remaining: 100,
+    user_30_day_rank: null,
+    reward_unlocked: false,
+  };
+}
+
+export interface LeaderboardEntry {
+  rank: number;
+  user_id: string;
+  display_name: string;
+  current_streak: number;
+  longest_streak: number;
+  is_pro: boolean;
+}
+
+export interface StreakOfferItem {
+  id: string;
+  title: string;
+  title_bn?: string;
+  description: string;
+  description_bn?: string;
+  min_streak: number;
+  reward_days: number;
+  max_claims: number;
+  is_active: boolean;
+}
+
+export interface StreakOfferApplication {
+  id: string;
+  user_id: string;
+  offer_id: string;
+  offer_title: string;
+  reward_days: number;
+  streak_at_apply: number;
+  status: 'pending' | 'approved' | 'rejected';
+  applied_at: string;
+  reviewed_at?: string | null;
+}
+
+export interface StreakLeaderboardResponse {
+  top_10: LeaderboardEntry[];
+  total_participants: number;
+  my_rank: number | null;
+  my_streak: number;
+  offers: StreakOfferItem[];
+  applications: StreakOfferApplication[];
+}
+
+export async function fetchStreakLeaderboard(userId: string): Promise<StreakLeaderboardResponse> {
+  try {
+    const res = await fetchWithTimeout(
+      `${API_BASE_URL}/api/streak/leaderboard?user_id=${encodeURIComponent(userId)}`,
+      {},
+      20000
+    );
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (e) {
+    console.warn("Leaderboard offline fallback:", e);
+  }
+  return {
+    top_10: [],
+    total_participants: 0,
+    my_rank: null,
+    my_streak: 0,
+    offers: [],
+    applications: [],
+  };
+}
+
+export async function applyForStreakOffer(userId: string, offerId: string): Promise<StreakOfferApplication> {
+  const res = await fetchWithTimeout(
+    `${API_BASE_URL}/api/streak/${encodeURIComponent(userId)}/apply-offer?offer_id=${encodeURIComponent(offerId)}`,
+    { method: 'POST' },
+    20000
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Could not submit application' }));
+    throw new Error(err.detail || 'Could not submit application');
+  }
+  const data = await res.json();
+  return data.application;
 }
 
 // --- LEGACY BACKWARD COMPATIBILITY ---
@@ -1919,9 +2073,22 @@ export interface MessSummary {
 
 export async function fetchMessSummary(userId: string, month?: string): Promise<MessSummary> {
   const url = month ? `${API_BASE_URL}/api/mess/${userId}?month=${month}` : `${API_BASE_URL}/api/mess/${userId}`;
-  const res = await fetchWithTimeout(url, {}, 8000);
-  if (!res.ok) throw new Error(`Failed to fetch mess summary: ${res.status}`);
-  return await res.json();
+  const cacheKey = `@pockit_mess_${userId}`;
+  try {
+    const res = await fetchWithTimeout(url, {}, 25000);
+    if (res.ok) {
+      const data: MessSummary = await res.json();
+      await AsyncStorage.setItem(cacheKey, JSON.stringify(data));
+      return data;
+    }
+  } catch (e) {
+    const cached = await AsyncStorage.getItem(cacheKey);
+    if (cached) return JSON.parse(cached);
+    throw e;
+  }
+  const cached = await AsyncStorage.getItem(cacheKey);
+  if (cached) return JSON.parse(cached);
+  throw new Error('Failed to fetch mess summary');
 }
 
 export async function logMessMeal(payload: {
@@ -1930,11 +2097,11 @@ export async function logMessMeal(payload: {
   meal_count: number;
   note?: string;
 }): Promise<any> {
-  const res = await fetch(`${API_BASE_URL}/api/mess/meal`, {
+  const res = await fetchWithTimeout(`${API_BASE_URL}/api/mess/meal`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
-  });
+  }, 25000);
   if (!res.ok) throw new Error(`Failed to log mess meal: ${res.status}`);
   return await res.json();
 }
@@ -1943,11 +2110,11 @@ export async function updateEstimatedMealRate(payload: {
   user_id: string;
   estimated_meal_rate: number;
 }): Promise<any> {
-  const res = await fetch(`${API_BASE_URL}/api/mess/rate`, {
+  const res = await fetchWithTimeout(`${API_BASE_URL}/api/mess/rate`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
-  });
+  }, 25000);
   if (!res.ok) throw new Error(`Failed to update meal rate: ${res.status}`);
   return await res.json();
 }
@@ -1957,34 +2124,36 @@ export async function updateMessTotalMeals(payload: {
   total_meals: number;
   month?: string;
 }): Promise<MessSummary> {
-  const res = await fetch(`${API_BASE_URL}/api/mess/total-meals`, {
+  const res = await fetchWithTimeout(`${API_BASE_URL}/api/mess/total-meals`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
-  });
+  }, 25000);
   if (!res.ok) throw new Error(`Failed to update total meals: ${res.status}`);
-  return await res.json();
+  const data: MessSummary = await res.json();
+  await AsyncStorage.setItem(`@pockit_mess_${payload.user_id}`, JSON.stringify(data)).catch(() => {});
+  return data;
 }
 
 export async function updateMessAdvance(payload: {
   user_id: string;
   meal_advance_paid: number;
 }): Promise<any> {
-  const res = await fetch(`${API_BASE_URL}/api/mess/advance`, {
+  const res = await fetchWithTimeout(`${API_BASE_URL}/api/mess/advance`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
-  });
+  }, 25000);
   if (!res.ok) throw new Error(`Failed to update mess advance: ${res.status}`);
   return await res.json();
 }
 
 export async function toggleMessMealSystem(userId: string, enableMessMeals: boolean): Promise<any> {
-  const res = await fetch(`${API_BASE_URL}/api/mess/toggle`, {
+  const res = await fetchWithTimeout(`${API_BASE_URL}/api/mess/toggle`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ user_id: userId, enable_mess_meals: enableMessMeals }),
-  });
+  }, 25000);
   if (!res.ok) throw new Error(`Failed to toggle mess meal system: ${res.status}`);
   return await res.json();
 }

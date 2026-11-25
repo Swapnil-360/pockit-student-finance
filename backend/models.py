@@ -232,6 +232,31 @@ class RiskScoreSummary(BaseModel):
     top_drivers: List[RiskDriver]
 
 
+class StreakDayItem(BaseModel):
+    day_label: str
+    date: str
+    status: Literal['completed', 'missed', 'today', 'upcoming']
+
+
+class StreakSummary(BaseModel):
+    user_id: str
+    current_streak: int = 0
+    longest_streak: int = 0
+    last_streak_date: Optional[str] = None
+    checked_in_today: bool = False
+    week_days: List[StreakDayItem] = []
+    monthly_completed_days: int = 0
+    monthly_total_days: int = 30
+    monthly_target_days: int = 24
+    monthly_pct: float = 0.0
+    monthly_80_unlocked: bool = False
+    reward_spots_total: int = 100
+    reward_spots_claimed: int = 0
+    reward_spots_remaining: int = 100
+    user_30_day_rank: Optional[int] = None
+    reward_unlocked: bool = False
+
+
 class DashboardResponse(BaseModel):
     user_id: str
     month: str
@@ -268,6 +293,7 @@ class DashboardResponse(BaseModel):
     coach_daily_limit: int = 10
     active_goal: Optional[Dict[str, Any]] = None
     on_track_streak: int = 0
+    streak_summary: Optional[StreakSummary] = None
     enable_mess_meals: Optional[bool] = None
 
 

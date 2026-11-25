@@ -177,7 +177,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
         activeOpacity={0.8}
       >
         <Text style={styles.feedbackTitle}>
-          {language === 'bn' ? '📊 মাস শেষে ফলাফল রেকর্ড করুন' : '📊 Log Your Actual Outcome'}
+          {language === 'bn' ? 'মাস শেষে ফলাফল রেকর্ড করুন' : 'Log Your Actual Outcome'}
         </Text>
         <Text style={styles.feedbackSub}>
           {language === 'bn'

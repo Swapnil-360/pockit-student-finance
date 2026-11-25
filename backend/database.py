@@ -13,7 +13,8 @@ import json
 import math
 import sqlite3
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
+import calendar
 from typing import Any, Dict, List, Optional, Tuple
 from config import SQLITE_DB_PATH, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, USE_SUPABASE
 
@@ -1271,7 +1272,7 @@ class Database:
                     sb_prof = res.data[0]
                     extra_settings = self._get_user_settings_from_supabase(user_id)
                     if extra_settings:
-                        for k in ('mess_meal_fixed', 'academic_fee_fixed', 'transport_fixed', 'enable_mess_meals'):
+                        for k in ('mess_meal_fixed', 'academic_fee_fixed', 'transport_fixed', 'enable_mess_meals', 'estimated_meal_rate'):
                             if k in extra_settings and extra_settings[k] is not None:
                                 sb_prof[k] = extra_settings[k]
                     self._restore_profile_to_sqlite(user_id, sb_prof)
@@ -1518,7 +1519,23 @@ class Database:
                 feedback_notes, json.dumps(survey_row)
             ))
             conn.commit()
-            return checkin_id
+
+        if self.supabase:
+            try:
+                self.supabase.table('month_end_checkins').insert({
+                    'id': self._to_uuid(checkin_id),
+                    'user_id': self._to_uuid(user_id),
+                    'month': month,
+                    'actual_ran_out_of_money': bool(actual_ran_out_of_money),
+                    'final_risk_score_predicted': float(final_risk_score_predicted),
+                    'final_spent_total': float(final_spent_total),
+                    'feedback_notes': feedback_notes,
+                    'survey_row_json': json.dumps(survey_row),
+                }).execute()
+            except Exception as e:
+                print(f"[Supabase sync notice] record_month_end_checkin: {e}")
+
+        return checkin_id
 
     def get_all_checkins_for_retraining(self) -> List[Dict[str, Any]]:
         """Returns all collected check-in records formatted in the survey schema."""
@@ -1760,6 +1777,25 @@ class Database:
                 WHERE id = ?
             """, (expiry, user_id))
             conn.commit()
+
+        if self.supabase:
+            try:
+                sb_uid = self._to_uuid(user_id)
+                self.supabase.table('subscription_payments').insert({
+                    'id': self._to_uuid(sub_id),
+                    'user_id': sb_uid,
+                    'payment_method': payment_method,
+                    'trx_id': trx_id.strip(),
+                    'amount': float(amount),
+                    'status': 'approved',
+                    'approved_at': datetime.utcnow().isoformat(),
+                }).execute()
+                self.supabase.table('profiles').update({
+                    'is_pro': True,
+                    'subscription_expiry': expiry,
+                }).eq('user_id', sb_uid).execute()
+            except Exception as e:
+                print(f"[Supabase sync notice] submit_subscription_payment: {e}")
 
         return {
             "payment_id": sub_id,
@@ -2168,27 +2204,251 @@ class Database:
 
         return deleted
 
-    def get_and_update_streak(self, user_id: str) -> int:
-        today_str = datetime.now().strftime("%Y-%m-%d")
+    def _dhaka_now(self) -> datetime:
+        """Returns current Bangladesh Standard Time (Asia/Dhaka, UTC+6) without external pytz dependencies."""
+        return datetime.utcnow() + timedelta(hours=6)
+
+    def _get_global_30_winners(self) -> List[Dict[str, Any]]:
+        """Reads the persistent First-100 30-day streak winners list from Supabase or local SQLite."""
+        if self.supabase:
+            try:
+                res = (
+                    self.supabase.table('monthly_archives')
+                    .select('summary_json')
+                    .eq('month', '__global_streak_30_winners__')
+                    .limit(1)
+                    .execute()
+                )
+                if res.data and len(res.data) > 0:
+                    raw = res.data[0].get('summary_json')
+                    parsed = raw if isinstance(raw, dict) else (json.loads(raw) if isinstance(raw, str) else {})
+                    winners = parsed.get('winners', [])
+                    if isinstance(winners, list):
+                        return winners
+            except Exception as e:
+                print(f"[Supabase sync notice] _get_global_30_winners: {e}")
+
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT on_track_streak, last_streak_date FROM users WHERE id = ?", (user_id,))
+            cursor.execute("SELECT summary_json FROM monthly_archives WHERE month = '__global_streak_30_winners__' LIMIT 1")
             row = cursor.fetchone()
-            if not row:
-                return 0
-            current_streak = row["on_track_streak"] or 0
-            last_date = row["last_streak_date"]
+            if row and row["summary_json"]:
+                try:
+                    parsed = json.loads(row["summary_json"])
+                    winners = parsed.get("winners", [])
+                    if isinstance(winners, list):
+                        return winners
+                except Exception:
+                    pass
+        return []
 
-            if last_date == today_str:
-                return max(1, current_streak)
+    def _save_global_30_winners(self, owner_user_id: str, winners: List[Dict[str, Any]]):
+        """Persists the First-100 30-day streak winners registry to SQLite and Supabase."""
+        global_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, "__global_streak_30_winners__"))
+        payload_json = json.dumps({"winners": winners[:100]})
 
-            new_streak = current_streak + 1 if current_streak > 0 else 1
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
             cursor.execute("""
-                UPDATE users SET on_track_streak = ?, last_streak_date = ?
-                WHERE id = ?
-            """, (new_streak, today_str, user_id))
+                INSERT OR REPLACE INTO monthly_archives (
+                    id, user_id, month, total_income, total_spent, ending_balance, final_risk_score, summary_json
+                ) VALUES (?, ?, '__global_streak_30_winners__', 0, 0, 0, 0, ?)
+            """, (global_id, owner_user_id, payload_json))
             conn.commit()
-            return new_streak
+
+        if self.supabase:
+            try:
+                sb_uid = self._to_uuid(owner_user_id)
+                self.supabase.table('monthly_archives').upsert({
+                    'id': global_id,
+                    'user_id': sb_uid,
+                    'month': '__global_streak_30_winners__',
+                    'total_income': 0,
+                    'total_spent': 0,
+                    'ending_balance': 0,
+                    'final_risk_score': 0,
+                    'summary_json': payload_json,
+                }).execute()
+            except Exception as e:
+                print(f"[Supabase sync notice] _save_global_30_winners: {e}")
+
+    def get_streak_summary(self, user_id: str, check_in_today: bool = True) -> Dict[str, Any]:
+        """
+        Continuous cross-week streak engine:
+        - Resets strictly if yesterday was missed (unless already checked in today).
+        - Tracks longest_streak, 7-day current week breakdown (Sun-Sat), and 80% monthly consistency.
+        - Awards First 100 users who reach >= 30 continuous streak days via Supabase global registry.
+        """
+        now_dt = self._dhaka_now()
+        today_str = now_dt.strftime("%Y-%m-%d")
+        yesterday_str = (now_dt - timedelta(days=1)).strftime("%Y-%m-%d")
+
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT on_track_streak, last_streak_date, is_pro, subscription_expiry FROM users WHERE id = ?", (user_id,))
+            row = cursor.fetchone()
+
+        sqlite_streak = int((row["on_track_streak"] or 0) if row else 0)
+        sqlite_last = row["last_streak_date"] if row else None
+
+        # Restore from Supabase settings if available so restarts never wipe streak
+        extra = self._get_user_settings_from_supabase(user_id) if self.supabase else {}
+        sb_streak = int(extra.get("streak_current") or 0)
+        sb_longest = int(extra.get("streak_longest") or 0)
+        sb_last = extra.get("streak_last_date")
+        active_dates: List[str] = extra.get("streak_active_dates") if isinstance(extra.get("streak_active_dates"), list) else []
+
+        # Pick most recent source between SQLite and Supabase
+        if sb_last and (not sqlite_last or sb_last >= sqlite_last):
+            current_streak = sb_streak
+            last_date = sb_last
+        else:
+            current_streak = sqlite_streak
+            last_date = sqlite_last
+
+        longest_streak = max(sb_longest, current_streak)
+
+        if last_date and last_date not in active_dates:
+            active_dates.append(last_date)
+
+        changed = False
+        if check_in_today:
+            if last_date == today_str:
+                current_streak = max(1, current_streak)
+            elif last_date == yesterday_str:
+                current_streak = max(1, current_streak + 1)
+                last_date = today_str
+                changed = True
+            else:
+                # Strict reset when >= 1 day was missed (or first day)
+                current_streak = 1
+                last_date = today_str
+                changed = True
+
+            if today_str not in active_dates:
+                active_dates.append(today_str)
+                changed = True
+        else:
+            # Read-only check: if user missed yesterday and hasn't checked in today, streak is broken (0)
+            if last_date not in (today_str, yesterday_str):
+                if current_streak != 0:
+                    current_streak = 0
+                    changed = True
+
+        longest_streak = max(longest_streak, current_streak)
+        active_dates = sorted(set(d for d in active_dates if isinstance(d, str) and len(d) == 10))[-70:]
+
+        # Monthly 80% consistency target
+        month_prefix = now_dt.strftime("%Y-%m")
+        days_in_month = calendar.monthrange(now_dt.year, now_dt.month)[1]
+        monthly_completed_days = len([d for d in active_dates if d.startswith(month_prefix)])
+        monthly_target_days = int(math.ceil(days_in_month * 0.80))
+        monthly_pct = round(min(100.0, (monthly_completed_days / max(1, days_in_month)) * 100.0), 1)
+        monthly_80_unlocked = monthly_completed_days >= monthly_target_days
+
+        # Current week 7-day strip (Sun -> Sat)
+        days_since_sunday = (now_dt.weekday() + 1) % 7
+        week_start = now_dt - timedelta(days=days_since_sunday)
+        day_labels = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
+        week_days = []
+        for i in range(7):
+            d_dt = week_start + timedelta(days=i)
+            d_str = d_dt.strftime("%Y-%m-%d")
+            if d_str in active_dates:
+                status = "completed"
+            elif d_str == today_str:
+                status = "today"
+            elif d_str < today_str:
+                status = "missed"
+            else:
+                status = "upcoming"
+            week_days.append({
+                "day_label": day_labels[i],
+                "date": d_str,
+                "status": status,
+            })
+
+        # First 100 users 30-day streak challenge check
+        winners = self._get_global_30_winners()
+        sb_uid = self._to_uuid(user_id)
+        user_rank: Optional[int] = None
+        for w in winners:
+            if w.get("user_id") in (user_id, sb_uid):
+                user_rank = int(w.get("rank"))
+                break
+
+        is_eligible_user = user_id not in ("demo_student_001", "guest_local_001")
+        if is_eligible_user and current_streak >= 30 and user_rank is None and len(winners) < 100:
+            user_rank = len(winners) + 1
+            winners.append({
+                "rank": user_rank,
+                "user_id": sb_uid,
+                "achieved_at": today_str,
+                "streak": current_streak,
+            })
+            self._save_global_30_winners(user_id, winners)
+            # Grant 30-day Pro reward automatically
+            expiry_str = (now_dt + timedelta(days=30)).strftime("%Y-%m-%d")
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "UPDATE users SET is_pro = 1, subscription_expiry = ? WHERE id = ?",
+                    (expiry_str, user_id),
+                )
+                conn.commit()
+            if self.supabase:
+                try:
+                    self.supabase.table('profiles').update({
+                        'is_pro': True,
+                        'subscription_expiry': expiry_str,
+                    }).eq('user_id', sb_uid).execute()
+                except Exception as e:
+                    print(f"[Supabase sync notice] streak 30 pro unlock: {e}")
+
+        reward_spots_total = 100
+        reward_spots_claimed = min(100, len(winners))
+        reward_spots_remaining = max(0, 100 - reward_spots_claimed)
+        reward_unlocked = user_rank is not None
+
+        if changed or sb_streak != current_streak or sb_longest != longest_streak:
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "UPDATE users SET on_track_streak = ?, last_streak_date = ? WHERE id = ?",
+                    (current_streak, last_date, user_id),
+                )
+                conn.commit()
+            if self.supabase and is_eligible_user:
+                self._save_user_settings_to_supabase(user_id, {
+                    "streak_current": current_streak,
+                    "streak_longest": longest_streak,
+                    "streak_last_date": last_date,
+                    "streak_active_dates": active_dates,
+                    "streak_30_rank": user_rank,
+                })
+
+        return {
+            "user_id": user_id,
+            "current_streak": current_streak,
+            "longest_streak": longest_streak,
+            "last_streak_date": last_date,
+            "checked_in_today": last_date == today_str,
+            "week_days": week_days,
+            "monthly_completed_days": monthly_completed_days,
+            "monthly_total_days": days_in_month,
+            "monthly_target_days": monthly_target_days,
+            "monthly_pct": monthly_pct,
+            "monthly_80_unlocked": monthly_80_unlocked,
+            "reward_spots_total": reward_spots_total,
+            "reward_spots_claimed": reward_spots_claimed,
+            "reward_spots_remaining": reward_spots_remaining,
+            "user_30_day_rank": user_rank,
+            "reward_unlocked": reward_unlocked,
+        }
+
+    def get_and_update_streak(self, user_id: str) -> int:
+        summary = self.get_streak_summary(user_id, check_in_today=True)
+        return int(summary.get("current_streak", 0))
 
     # --- USER DELETION & ACCOUNT REMOVAL ---
     def delete_user(self, user_id: str) -> bool:
@@ -2198,25 +2458,38 @@ class Database:
         """
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("DELETE FROM expenses WHERE user_id = ?", (user_id,))
-            cursor.execute("DELETE FROM incomes WHERE user_id = ?", (user_id,))
-            cursor.execute("DELETE FROM savings_goals WHERE user_id = ?", (user_id,))
-            cursor.execute("DELETE FROM risk_snapshots WHERE user_id = ?", (user_id,))
-            cursor.execute("DELETE FROM month_end_checkins WHERE user_id = ?", (user_id,))
-            cursor.execute("DELETE FROM monthly_archives WHERE user_id = ?", (user_id,))
-            cursor.execute("DELETE FROM subscription_payments WHERE user_id = ?", (user_id,))
-            cursor.execute("DELETE FROM profiles WHERE user_id = ?", (user_id,))
-            cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
+            for tbl, col in [
+                ("expenses", "user_id"),
+                ("incomes", "user_id"),
+                ("savings_goals", "user_id"),
+                ("mess_meals", "user_id"),
+                ("risk_snapshots", "user_id"),
+                ("month_end_checkins", "user_id"),
+                ("monthly_archives", "user_id"),
+                ("subscription_payments", "user_id"),
+                ("streak_offer_applications", "user_id"),
+                ("feedback_items", "user_id"),
+                ("profiles", "user_id"),
+                ("users", "id"),
+            ]:
+                try:
+                    cursor.execute(f"DELETE FROM {tbl} WHERE {col} = ?", (user_id,))
+                except Exception:
+                    pass
             conn.commit()
 
         if self.supabase:
             try:
                 user_uuid = self._to_uuid(user_id)
-                for tbl in ['expenses', 'incomes', 'savings_goals', 'profiles', 'users']:
+                for tbl in ['expenses', 'incomes', 'savings_goals', 'monthly_archives', 'profiles', 'users']:
                     try:
                         self.supabase.table(tbl).delete().eq('user_id' if tbl != 'users' else 'id', user_uuid).execute()
                     except Exception:
                         pass
+                try:
+                    self.supabase.auth.admin.delete_user(user_uuid)
+                except Exception as e:
+                    print(f"[Supabase sync notice] auth.admin.delete_user: {e}")
             except Exception as e:
                 print(f"[Supabase sync notice] delete_user error: {e}")
 
@@ -2549,6 +2822,44 @@ class Database:
             return cursor.rowcount > 0
 
     # --- 11. PERSONAL MESS MEAL & DEPOSIT METHODS (আমার মেস মিল) ---
+    def _sync_mess_meals_to_supabase(self, user_id: str):
+        """Persists all user mess_meals entries into Supabase __user_settings__ so cold starts never lose meals."""
+        if not self.supabase:
+            return
+        try:
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT date, meal_count FROM mess_meals WHERE user_id = ?", (user_id,))
+                rows = cursor.fetchall()
+            meals_map = {r[0]: float(r[1]) for r in rows}
+            self._save_user_settings_to_supabase(user_id, {"mess_meals_map": meals_map})
+        except Exception as e:
+            print(f"[Supabase sync notice] _sync_mess_meals: {e}")
+
+    def _restore_mess_meals_from_supabase(self, user_id: str):
+        """Restores mess_meals from Supabase __user_settings__ into local SQLite when SQLite is empty."""
+        if not self.supabase:
+            return
+        try:
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT COUNT(*) FROM mess_meals WHERE user_id = ?", (user_id,))
+                count = cursor.fetchone()[0]
+            if count == 0:
+                extra = self._get_user_settings_from_supabase(user_id)
+                meals_map = extra.get("mess_meals_map")
+                if isinstance(meals_map, dict) and meals_map:
+                    with self._get_connection() as conn:
+                        cursor = conn.cursor()
+                        for d_key, m_cnt in meals_map.items():
+                            cursor.execute("""
+                                INSERT OR REPLACE INTO mess_meals (id, user_id, date, meal_count, note)
+                                VALUES (?, ?, ?, ?, ?)
+                            """, (str(uuid.uuid4()), user_id, str(d_key), float(m_cnt), "Restored from cloud"))
+                        conn.commit()
+        except Exception as e:
+            print(f"[Supabase sync notice] _restore_mess_meals: {e}")
+
     def log_mess_meal(self, user_id: str, date: str, meal_count: float, note: Optional[str] = None) -> Dict[str, Any]:
         meal_id = str(uuid.uuid4())
         with self._get_connection() as conn:
@@ -2561,16 +2872,18 @@ class Database:
                     note = excluded.note
             """, (meal_id, user_id, date, float(meal_count), (note or "").strip()))
             conn.commit()
+        self._sync_mess_meals_to_supabase(user_id)
 
         return {"status": "success", "user_id": user_id, "date": date, "meal_count": float(meal_count)}
 
     def get_mess_summary(self, user_id: str, month: Optional[str] = None) -> Dict[str, Any]:
-        now = datetime.now()
+        now = self._dhaka_now()
         month_str = month or now.strftime("%Y-%m")
         profile = self.get_profile(user_id) or {}
+        self._restore_mess_meals_from_supabase(user_id)
 
         meal_advance_paid = float(profile.get("mess_meal_fixed", 0.0))
-        estimated_meal_rate = float(profile.get("estimated_meal_rate", 50.0))
+        estimated_meal_rate = float(profile.get("estimated_meal_rate") or 50.0)
 
         with self._get_connection() as conn:
             cursor = conn.cursor()
@@ -2609,23 +2922,30 @@ class Database:
         }
 
     def toggle_mess_meal_system(self, user_id: str, enable: bool) -> bool:
+        self.get_profile(user_id)
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("UPDATE profiles SET enable_mess_meals = ? WHERE user_id = ?", (1 if enable else 0, user_id))
             conn.commit()
-            return cursor.rowcount > 0
+            updated = cursor.rowcount > 0
+        self._save_user_settings_to_supabase(user_id, {'enable_mess_meals': bool(enable)})
+        return updated
 
     def update_estimated_meal_rate(self, user_id: str, rate: float) -> bool:
+        self.get_profile(user_id)
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("UPDATE profiles SET estimated_meal_rate = ? WHERE user_id = ?", (float(rate), user_id))
             conn.commit()
-            return cursor.rowcount > 0
+            updated = cursor.rowcount > 0
+        self._save_user_settings_to_supabase(user_id, {'estimated_meal_rate': float(rate)})
+        return updated
 
     def update_mess_total_meals(self, user_id: str, target_total_meals: float, month: Optional[str] = None) -> Dict[str, Any]:
-        now = datetime.now()
+        now = self._dhaka_now()
         month_str = month or now.strftime("%Y-%m")
         target_total = max(0.0, float(target_total_meals))
+        self._restore_mess_meals_from_supabase(user_id)
 
         with self._get_connection() as conn:
             cursor = conn.cursor()
@@ -2657,10 +2977,12 @@ class Database:
                     note = excluded.note
             """, (meal_id, user_id, offset_key, offset, "Past meals adjustment / পূর্ববর্তী মিল হিসাব"))
             conn.commit()
+        self._sync_mess_meals_to_supabase(user_id)
 
         return self.get_mess_summary(user_id, month=month_str)
 
     def update_mess_advance(self, user_id: str, meal_advance_paid: float) -> bool:
+        self.get_profile(user_id)
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("UPDATE profiles SET mess_meal_fixed = ? WHERE user_id = ?", (float(meal_advance_paid), user_id))
@@ -2668,6 +2990,714 @@ class Database:
             updated = cursor.rowcount > 0
         self._save_user_settings_to_supabase(user_id, {'mess_meal_fixed': float(meal_advance_paid)})
         return updated
+
+    # --- STREAK LEADERBOARD, DYNAMIC OFFERS & ADMIN OPERATIONS ---
+    def _get_global_doc(self, month_key: str) -> Dict[str, Any]:
+        """Reads a global JSON document from Supabase monthly_archives with SQLite fallback."""
+        if self.supabase:
+            try:
+                res = (
+                    self.supabase.table('monthly_archives')
+                    .select('summary_json')
+                    .eq('month', month_key)
+                    .limit(1)
+                    .execute()
+                )
+                if res.data and len(res.data) > 0:
+                    raw = res.data[0].get('summary_json')
+                    if isinstance(raw, dict):
+                        return raw
+                    if isinstance(raw, str):
+                        return json.loads(raw)
+            except Exception as e:
+                print(f"[Supabase sync notice] _get_global_doc({month_key}): {e}")
+
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT summary_json FROM monthly_archives WHERE month = ? LIMIT 1", (month_key,))
+            row = cursor.fetchone()
+            if row and row["summary_json"]:
+                try:
+                    return json.loads(row["summary_json"])
+                except Exception:
+                    pass
+        return {}
+
+    def _save_global_doc(self, month_key: str, data: Dict[str, Any], owner_user_id: Optional[str] = None):
+        """Persists a global JSON document to SQLite & Supabase monthly_archives."""
+        doc_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, month_key))
+        payload_json = json.dumps(data)
+        local_uid = owner_user_id or "demo_student_001"
+
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT OR REPLACE INTO monthly_archives (
+                    id, user_id, month, total_income, total_spent, ending_balance, final_risk_score, summary_json
+                ) VALUES (?, ?, ?, 0, 0, 0, 0, ?)
+            """, (doc_id, local_uid, month_key, payload_json))
+            conn.commit()
+
+        if self.supabase:
+            try:
+                sb_uid = self._to_uuid(owner_user_id) if owner_user_id else None
+                if not sb_uid or sb_uid == '00000000-0000-0000-0000-000000000001':
+                    # Pick any valid auth user UUID if owner wasn't provided
+                    try:
+                        auth_list = self.supabase.auth.admin.list_users(page=1, per_page=1)
+                        if auth_list and len(auth_list) > 0:
+                            sb_uid = auth_list[0].id
+                    except Exception:
+                        pass
+                if sb_uid:
+                    self.supabase.table('monthly_archives').upsert({
+                        'id': doc_id,
+                        'user_id': sb_uid,
+                        'month': month_key,
+                        'total_income': 0,
+                        'total_spent': 0,
+                        'ending_balance': 0,
+                        'final_risk_score': 0,
+                        'summary_json': payload_json,
+                    }).execute()
+            except Exception as e:
+                print(f"[Supabase sync notice] _save_global_doc({month_key}): {e}")
+
+    def get_streak_offers(self, include_inactive: bool = False) -> List[Dict[str, Any]]:
+        doc = self._get_global_doc("__global_streak_offers__")
+        offers = doc.get("offers")
+        if not isinstance(offers, list) or len(offers) == 0:
+            offers = [{
+                "id": "offer_30d_smart_coach",
+                "title": "30 Days Free Smart Coach",
+                "title_bn": "৩০ দিনের ফ্রি স্মার্ট কোচ অফার",
+                "description": "Complete a continuous 30-day streak to apply for 30 days of free Pockit Smart Coach Pro (First 100 eligible students).",
+                "description_bn": "একটানা ৩০ দিন স্ট্রিক পূর্ণ করে প্রথম ১০০ জনের মধ্যে ৩০ দিনের ফ্রি স্মার্ট কোচ প্রো অফারের জন্য আবেদন করুন।",
+                "min_streak": 30,
+                "reward_days": 30,
+                "max_claims": 100,
+                "is_active": True,
+                "created_at": "2026-11-25",
+            }]
+        if include_inactive:
+            return offers
+        return [o for o in offers if o.get("is_active", True)]
+
+    def upsert_streak_offer(self, offer: Dict[str, Any], owner_user_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        offers = self.get_streak_offers(include_inactive=True)
+        oid = offer.get("id") or f"offer_{str(uuid.uuid4())[:8]}"
+        new_item = {
+            "id": oid,
+            "title": str(offer.get("title", "Streak Reward")).strip(),
+            "title_bn": str(offer.get("title_bn") or offer.get("title", "স্ট্রিক অফার")).strip(),
+            "description": str(offer.get("description", "")).strip(),
+            "description_bn": str(offer.get("description_bn") or offer.get("description", "")).strip(),
+            "min_streak": int(offer.get("min_streak") or 30),
+            "reward_days": int(offer.get("reward_days") or 30),
+            "max_claims": int(offer.get("max_claims") or 100),
+            "is_active": bool(offer.get("is_active", True)),
+            "created_at": offer.get("created_at") or self._dhaka_now().strftime("%Y-%m-%d"),
+        }
+        replaced = False
+        for i, existing in enumerate(offers):
+            if existing.get("id") == oid:
+                offers[i] = new_item
+                replaced = True
+                break
+        if not replaced:
+            offers.insert(0, new_item)
+        self._save_global_doc("__global_streak_offers__", {"offers": offers}, owner_user_id)
+        return offers
+
+    def delete_streak_offer(self, offer_id: str) -> bool:
+        offers = self.get_streak_offers(include_inactive=True)
+        filtered = [o for o in offers if o.get("id") != offer_id]
+        if len(filtered) == len(offers):
+            return False
+        self._save_global_doc("__global_streak_offers__", {"offers": filtered})
+        return True
+
+    def admin_list_offer_applications(self) -> List[Dict[str, Any]]:
+        doc = self._get_global_doc("__global_streak_applications__")
+        apps = doc.get("applications", [])
+        return apps if isinstance(apps, list) else []
+
+    def get_user_offer_applications(self, user_id: str) -> List[Dict[str, Any]]:
+        sb_uid = self._to_uuid(user_id)
+        return [a for a in self.admin_list_offer_applications() if a.get("user_id") in (user_id, sb_uid)]
+
+    def apply_for_streak_offer(self, user_id: str, offer_id: str) -> Dict[str, Any]:
+        offers = self.get_streak_offers(include_inactive=False)
+        offer = next((o for o in offers if o.get("id") == offer_id), None)
+        if not offer:
+            raise ValueError("Offer not found or inactive.")
+
+        streak_info = self.get_streak_summary(user_id, check_in_today=False)
+        eligible_streak = max(int(streak_info.get("current_streak") or 0), int(streak_info.get("longest_streak") or 0))
+        min_req = int(offer.get("min_streak") or 30)
+        if eligible_streak < min_req:
+            raise ValueError(f"You need at least {min_req} streak days to apply (current: {eligible_streak}).")
+
+        apps = self.admin_list_offer_applications()
+        sb_uid = self._to_uuid(user_id)
+        for existing in apps:
+            if existing.get("user_id") in (user_id, sb_uid) and existing.get("offer_id") == offer_id:
+                if existing.get("status") in ("pending", "approved"):
+                    return existing
+
+        approved_count = sum(1 for a in apps if a.get("offer_id") == offer_id and a.get("status") == "approved")
+        if approved_count >= int(offer.get("max_claims") or 100):
+            raise ValueError("All spots for this offer have been claimed.")
+
+        user = self.get_user(user_id) or {}
+        new_app = {
+            "id": str(uuid.uuid4()),
+            "user_id": sb_uid,
+            "raw_user_id": user_id,
+            "user_name": user.get("calling_name") or user.get("full_name") or "Student",
+            "user_email": user.get("email") or "",
+            "offer_id": offer_id,
+            "offer_title": offer.get("title"),
+            "reward_days": int(offer.get("reward_days") or 30),
+            "streak_at_apply": eligible_streak,
+            "status": "pending",
+            "admin_note": "",
+            "applied_at": self._dhaka_now().strftime("%Y-%m-%d %H:%M:%S"),
+            "reviewed_at": None,
+        }
+        apps.insert(0, new_app)
+        self._save_global_doc("__global_streak_applications__", {"applications": apps}, user_id)
+        return new_app
+
+    def admin_review_offer_application(self, app_id: str, action: str, admin_note: str = "") -> Optional[Dict[str, Any]]:
+        apps = self.admin_list_offer_applications()
+        target = None
+        for a in apps:
+            if a.get("id") == app_id:
+                target = a
+                break
+        if not target:
+            return None
+
+        target["status"] = "approved" if action == "approve" else "rejected"
+        target["admin_note"] = admin_note
+        target["reviewed_at"] = self._dhaka_now().strftime("%Y-%m-%d %H:%M:%S")
+        self._save_global_doc("__global_streak_applications__", {"applications": apps}, target.get("user_id"))
+
+        if action == "approve":
+            reward_days = int(target.get("reward_days") or 30)
+            self.admin_set_pro_status(target["user_id"], True, days=reward_days)
+        return target
+
+    def get_streak_leaderboard(self, user_id: Optional[str] = None, limit: int = 10) -> Dict[str, Any]:
+        """Returns Top 10 continuous streak leaderboard + requesting user's rank & streak."""
+        users = self.admin_list_all_users()
+        ranked_pool = []
+        for u in users:
+            uid = u.get("id")
+            if uid in ("demo_student_001", "guest_local_001"):
+                continue
+            cs = int(u.get("current_streak") or 0)
+            ls = int(u.get("longest_streak") or cs)
+            if cs > 0 or ls > 0:
+                ranked_pool.append({
+                    "user_id": uid,
+                    "email": u.get("email", ""),
+                    "full_name": u.get("full_name", "Student"),
+                    "display_name": u.get("calling_name") or (u.get("full_name") or "Student").split()[0],
+                    "current_streak": cs,
+                    "longest_streak": ls,
+                    "is_pro": bool(u.get("is_pro")),
+                })
+        ranked_pool.sort(key=lambda x: (x["current_streak"], x["longest_streak"]), reverse=True)
+        for idx, item in enumerate(ranked_pool, 1):
+            item["rank"] = idx
+
+        my_rank = None
+        my_streak = 0
+        sb_uid = self._to_uuid(user_id) if user_id else None
+        for item in ranked_pool:
+            if item["user_id"] in (user_id, sb_uid):
+                my_rank = item["rank"]
+                my_streak = item["current_streak"]
+                break
+
+        return {
+            "top_10": ranked_pool[:limit],
+            "total_participants": len(ranked_pool),
+            "my_rank": my_rank,
+            "my_streak": my_streak,
+        }
+
+    def admin_list_all_users(self, search: str = "", filter_tier: str = "all") -> List[Dict[str, Any]]:
+        """Merges Supabase Auth, profiles, __user_settings__, and SQLite users for the Admin Panel."""
+        users_map: Dict[str, Dict[str, Any]] = {}
+
+        # 1. Local SQLite users
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM users")
+            for r in cursor.fetchall():
+                d = dict(r)
+                if d["id"] in ("demo_student_001", "guest_local_001") or bool(d.get("is_demo")):
+                    continue
+                users_map[d["id"]] = {
+                    "id": d["id"],
+                    "email": d.get("email", ""),
+                    "full_name": d.get("full_name", "Student"),
+                    "calling_name": d.get("calling_name"),
+                    "is_demo": bool(d.get("is_demo")),
+                    "is_pro": bool(d.get("is_pro")),
+                    "subscription_expiry": d.get("subscription_expiry"),
+                    "has_pin": bool(d.get("pin_code_hash")),
+                    "avatar_url": d.get("avatar_url"),
+                    "current_streak": int(d.get("on_track_streak") or 0),
+                    "longest_streak": int(d.get("on_track_streak") or 0),
+                    "last_streak_date": d.get("last_streak_date"),
+                    "created_at": d.get("created_at"),
+                }
+
+        # 2. Supabase Auth + Profiles + Settings
+        if self.supabase:
+            try:
+                sb_users = self.supabase.auth.admin.list_users(page=1, per_page=500)
+                profs_res = self.supabase.table("profiles").select("*").execute()
+                profs_by_uid = {p["user_id"]: p for p in (profs_res.data or [])}
+
+                settings_res = self.supabase.table("monthly_archives").select("user_id, summary_json").eq("month", "__user_settings__").execute()
+                settings_by_uid: Dict[str, Dict[str, Any]] = {}
+                for srow in (settings_res.data or []):
+                    raw = srow.get("summary_json")
+                    try:
+                        settings_by_uid[srow["user_id"]] = raw if isinstance(raw, dict) else json.loads(raw)
+                    except Exception:
+                        pass
+
+                for su in (sb_users or []):
+                    uid = su.id
+                    email_norm = (su.email or "").strip().lower()
+                    meta = su.user_metadata or {}
+                    prof = profs_by_uid.get(uid, {})
+                    ext = settings_by_uid.get(uid, {})
+                    existing = users_map.get(uid, {})
+                    if not existing and email_norm:
+                        # Merge & remove any duplicate SQLite-only entry sharing the same email
+                        dup_keys = [
+                            k for k, v in users_map.items()
+                            if k != uid and (v.get("email") or "").strip().lower() == email_norm
+                        ]
+                        for dk in dup_keys:
+                            dup = users_map.pop(dk)
+                            if not existing:
+                                existing = dup
+                            else:
+                                existing["is_pro"] = existing.get("is_pro") or dup.get("is_pro")
+                                existing["current_streak"] = max(existing.get("current_streak") or 0, dup.get("current_streak") or 0)
+                                existing["longest_streak"] = max(existing.get("longest_streak") or 0, dup.get("longest_streak") or 0)
+                    users_map[uid] = {
+                        "id": uid,
+                        "email": su.email or existing.get("email", ""),
+                        "full_name": meta.get("full_name") or existing.get("full_name") or (su.email.split("@")[0] if su.email else "Student"),
+                        "calling_name": ext.get("calling_name") or meta.get("calling_name") or existing.get("calling_name"),
+                        "is_demo": False,
+                        "is_pro": bool(prof.get("is_pro") or existing.get("is_pro")),
+                        "subscription_expiry": prof.get("subscription_expiry") or existing.get("subscription_expiry"),
+                        "has_pin": bool(prof.get("pin_code_hash") or existing.get("has_pin")),
+                        "avatar_url": prof.get("avatar_url") or meta.get("avatar_url") or meta.get("picture") or existing.get("avatar_url"),
+                        "current_streak": max(
+                            int(ext.get("streak_current") if ext.get("streak_current") is not None else 0),
+                            int(existing.get("current_streak") or 0),
+                        ),
+                        "longest_streak": max(
+                            int(ext.get("streak_longest") if ext.get("streak_longest") is not None else 0),
+                            int(existing.get("longest_streak") or 0),
+                        ),
+                        "last_streak_date": ext.get("streak_last_date") or existing.get("last_streak_date"),
+                        "created_at": str(getattr(su, "created_at", "") or existing.get("created_at") or ""),
+                        "monthly_allowance": float(prof.get("monthly_allowance_fixed") or existing.get("monthly_allowance") or 0),
+                        "monthly_rent": float(prof.get("monthly_rent_fixed") or existing.get("monthly_rent") or 0),
+                        "mess_meal": float(ext.get("mess_meal_fixed") or existing.get("mess_meal") or 0),
+                        "target_savings": float(prof.get("target_savings") or existing.get("target_savings") or 0),
+                        "university_type": prof.get("university_type") or existing.get("university_type"),
+                        "where_you_live": prof.get("where_you_live") or existing.get("where_you_live"),
+                    }
+            except Exception as e:
+                print(f"[Supabase sync notice] admin_list_all_users: {e}")
+
+        result = list(users_map.values())
+        q = search.strip().lower()
+        if q:
+            result = [u for u in result if q in (u.get("email") or "").lower() or q in (u.get("full_name") or "").lower() or q in (u.get("calling_name") or "").lower()]
+        if filter_tier == "pro":
+            result = [u for u in result if u.get("is_pro")]
+        elif filter_tier == "free":
+            result = [u for u in result if not u.get("is_pro")]
+        elif filter_tier == "streak30":
+            result = [u for u in result if (u.get("current_streak") or 0) >= 30]
+
+        result.sort(key=lambda x: (x.get("created_at") or ""), reverse=True)
+        return result
+
+    def admin_build_research_dataset(self) -> List[Dict[str, Any]]:
+        """
+        Builds a clean, ML/academic research-ready dataset combining every student's
+        onboarding/profile inputs, monthly income & category spending, time-of-day
+        spending patterns, and month-end money depletion ('running out of money') flags.
+        """
+        users = self.admin_list_all_users()
+        month_str = self._dhaka_now().strftime("%Y-%m")
+        dataset: List[Dict[str, Any]] = []
+
+        for u in users:
+            uid = u["id"]
+            prof = self.get_profile(uid) or {}
+            expenses = self.get_expenses(uid, limit=1000)
+            incomes = self.get_incomes(uid)
+
+            total_income_added = sum(float(i.get("amount") or 0) for i in incomes)
+            baseline_allowance = float(prof.get("monthly_allowance_fixed") or u.get("monthly_allowance") or 0)
+            total_funds = baseline_allowance + sum(
+                float(i.get("amount") or 0) for i in incomes if i.get("source") != "Family"
+            )
+
+            rent_fixed = float(prof.get("monthly_rent_fixed") or u.get("monthly_rent") or 0)
+            mess_fixed = float(prof.get("mess_meal_fixed") or u.get("mess_meal") or 0)
+            acad_fixed = float(prof.get("academic_fee_fixed") or 0)
+            trans_fixed = float(prof.get("transport_fixed") or 0)
+            enable_mess = bool(prof.get("enable_mess_meals", True))
+            fixed_obligations = rent_fixed + (mess_fixed if enable_mess else 0.0) + acad_fixed + trans_fixed
+
+            cat_totals: Dict[str, float] = {}
+            morning_tx = afternoon_tx = evening_tx = late_night_tx = 0
+            weekend_tx = weekday_tx = 0
+            total_spent = 0.0
+
+            for e in expenses:
+                amt = float(e.get("amount") or 0)
+                total_spent += amt
+                cat = str(e.get("category") or "Other")
+                cat_totals[cat] = cat_totals.get(cat, 0.0) + amt
+
+                ts_raw = str(e.get("created_at") or e.get("date") or "")
+                dt_obj = None
+                for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d"):
+                    try:
+                        dt_obj = datetime.strptime(ts_raw[:19], fmt)
+                        break
+                    except Exception:
+                        pass
+                if dt_obj:
+                    if dt_obj.weekday() in (4, 5):  # Fri/Sat BD weekend
+                        weekend_tx += 1
+                    else:
+                        weekday_tx += 1
+                    hr = dt_obj.hour
+                    if 6 <= hr < 12:
+                        morning_tx += 1
+                    elif 12 <= hr < 18:
+                        afternoon_tx += 1
+                    elif 18 <= hr <= 23:
+                        evening_tx += 1
+                    else:
+                        late_night_tx += 1
+
+            remaining_balance = total_funds - fixed_obligations - total_spent
+            top_cat = max(cat_totals.items(), key=lambda kv: kv[1])[0] if cat_totals else "None"
+
+            dataset.append({
+                "user_id": uid,
+                "email": u.get("email", ""),
+                "full_name": u.get("full_name", ""),
+                "month": month_str,
+                "gender": prof.get("gender"),
+                "age": prof.get("age"),
+                "university_type": prof.get("university_type"),
+                "year_of_study": prof.get("year_of_study"),
+                "where_you_live": prof.get("where_you_live"),
+                "main_source_of_money": prof.get("main_source_of_money"),
+                "do_you_earn_income": prof.get("do_you_earn_income"),
+                "monthly_allowance_fixed": baseline_allowance,
+                "monthly_rent_fixed": rent_fixed,
+                "mess_meal_fixed": mess_fixed,
+                "enable_mess_meals": enable_mess,
+                "estimated_meal_rate": prof.get("estimated_meal_rate", 50.0),
+                "academic_fee_fixed": acad_fixed,
+                "transport_fixed": trans_fixed,
+                "target_savings": float(prof.get("target_savings") or 0),
+                "awareness_score": prof.get("awareness_score"),
+                "impulse_score": prof.get("impulse_score"),
+                "track_spending": prof.get("track_spending"),
+                "mobile_banking_use": prof.get("mobile_banking_use"),
+                "borrowed_from_friends_baseline": prof.get("borrowed_from_friends_baseline"),
+                "total_income_added": round(total_income_added, 2),
+                "total_monthly_funds": round(total_funds, 2),
+                "fixed_obligations": round(fixed_obligations, 2),
+                "total_variable_spent": round(total_spent, 2),
+                "remaining_balance": round(remaining_balance, 2),
+                "ran_out_of_money": remaining_balance <= 0,
+                "deficit_amount": round(max(0.0, -remaining_balance), 2),
+                "top_spending_category": top_cat,
+                "food_spent": round(cat_totals.get("Food", 0.0), 2),
+                "transport_spent": round(cat_totals.get("Transport", 0.0), 2),
+                "shopping_spent": round(cat_totals.get("Shopping", 0.0), 2),
+                "entertainment_spent": round(cat_totals.get("Entertainment", 0.0), 2),
+                "education_spent": round(cat_totals.get("Education", 0.0), 2),
+                "other_spent": round(cat_totals.get("Other", 0.0), 2),
+                "expense_count": len(expenses),
+                "income_count": len(incomes),
+                "morning_tx_count": morning_tx,
+                "afternoon_tx_count": afternoon_tx,
+                "evening_tx_count": evening_tx,
+                "late_night_tx_count": late_night_tx,
+                "weekday_tx_count": weekday_tx,
+                "weekend_tx_count": weekend_tx,
+                "current_streak": u.get("current_streak", 0),
+                "longest_streak": u.get("longest_streak", 0),
+                "is_pro": u.get("is_pro", False),
+            })
+
+        return dataset
+
+    def admin_get_user_detail(self, user_id: str) -> Optional[Dict[str, Any]]:
+        users = self.admin_list_all_users()
+        sb_uid = self._to_uuid(user_id)
+        user_obj = next((u for u in users if u.get("id") in (user_id, sb_uid)), None)
+        if not user_obj:
+            return None
+        profile = self.get_profile(user_obj["id"])
+        expenses = self.get_expenses(user_obj["id"], limit=20)
+        incomes = self.get_incomes(user_obj["id"])
+        goals = self.get_user_goals(user_obj["id"])
+        streak = self.get_streak_summary(user_obj["id"], check_in_today=False)
+        return {
+            "user": user_obj,
+            "profile": profile,
+            "expenses": expenses,
+            "incomes": incomes,
+            "goals": goals,
+            "streak": streak,
+        }
+
+    def admin_set_pro_status(self, user_id: str, is_pro: bool, days: int = 30) -> Dict[str, Any]:
+        expiry = (self._dhaka_now() + timedelta(days=days)).strftime("%Y-%m-%d") if is_pro else None
+        sb_uid = self._to_uuid(user_id)
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE users SET is_pro = ?, subscription_expiry = ? WHERE id IN (?, ?)",
+                (1 if is_pro else 0, expiry, user_id, sb_uid),
+            )
+            conn.commit()
+        if self.supabase:
+            try:
+                self.supabase.table("profiles").update({
+                    "is_pro": bool(is_pro),
+                    "subscription_expiry": expiry,
+                }).eq("user_id", sb_uid).execute()
+            except Exception as e:
+                print(f"[Supabase sync notice] admin_set_pro_status: {e}")
+        return {"user_id": user_id, "is_pro": is_pro, "subscription_expiry": expiry}
+
+    def admin_reset_user_pin(self, user_id: str) -> bool:
+        sb_uid = self._to_uuid(user_id)
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("UPDATE users SET pin_code_hash = NULL WHERE id IN (?, ?)", (user_id, sb_uid))
+            conn.commit()
+        if self.supabase:
+            try:
+                self.supabase.table("profiles").update({"pin_code_hash": None}).eq("user_id", sb_uid).execute()
+            except Exception as e:
+                print(f"[Supabase sync notice] admin_reset_user_pin: {e}")
+        return True
+
+    def admin_adjust_user_streak(self, user_id: str, current_streak: int, longest_streak: Optional[int] = None) -> Dict[str, Any]:
+        sb_uid = self._to_uuid(user_id)
+        today_str = self._dhaka_now().strftime("%Y-%m-%d")
+        long_val = max(current_streak, longest_streak if longest_streak is not None else current_streak)
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE users SET on_track_streak = ?, last_streak_date = ? WHERE id IN (?, ?)",
+                (current_streak, today_str, user_id, sb_uid),
+            )
+            conn.commit()
+        if self.supabase:
+            self._save_user_settings_to_supabase(user_id, {
+                "streak_current": int(current_streak),
+                "streak_longest": int(long_val),
+                "streak_last_date": today_str,
+            })
+        return {"user_id": user_id, "current_streak": current_streak, "longest_streak": long_val}
+
+    def admin_list_payments(self) -> List[Dict[str, Any]]:
+        rows: List[Dict[str, Any]] = []
+        if self.supabase:
+            try:
+                res = self.supabase.table("subscription_payments").select("*").order("created_at", desc=True).limit(200).execute()
+                if res.data:
+                    rows = res.data
+            except Exception as e:
+                print(f"[Supabase sync notice] admin_list_payments: {e}")
+        if not rows:
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT * FROM subscription_payments ORDER BY created_at DESC LIMIT 200")
+                rows = [dict(r) for r in cursor.fetchall()]
+        return rows
+
+    def admin_update_payment_status(self, payment_id: str, status: str) -> Optional[Dict[str, Any]]:
+        target = None
+        if self.supabase:
+            try:
+                res = self.supabase.table("subscription_payments").update({
+                    "status": status,
+                    "approved_at": self._dhaka_now().isoformat() if status == "approved" else None,
+                }).eq("id", payment_id).execute()
+                if res.data:
+                    target = res.data[0]
+            except Exception as e:
+                print(f"[Supabase sync notice] admin_update_payment_status: {e}")
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("UPDATE subscription_payments SET status = ? WHERE id = ?", (status, payment_id))
+            conn.commit()
+            if not target:
+                cursor.execute("SELECT * FROM subscription_payments WHERE id = ?", (payment_id,))
+                row = cursor.fetchone()
+                if row:
+                    target = dict(row)
+        if target and target.get("user_id"):
+            self.admin_set_pro_status(target["user_id"], status == "approved", days=30)
+        return target
+
+    def admin_list_feedback(self) -> List[Dict[str, Any]]:
+        items: List[Dict[str, Any]] = []
+        triage_doc = self._get_global_doc("__admin_feedback_triage__")
+        triage_map = triage_doc.get("statuses", {}) if isinstance(triage_doc, dict) else {}
+
+        if self.supabase:
+            try:
+                res = self.supabase.table("month_end_checkins").select("*").order("created_at", desc=True).limit(200).execute()
+                for r in (res.data or []):
+                    fid = r.get("id")
+                    t_info = triage_map.get(fid, {})
+                    items.append({
+                        "id": fid,
+                        "source": "month_end_checkin",
+                        "user_id": r.get("user_id"),
+                        "month": r.get("month"),
+                        "actual_ran_out_of_money": bool(r.get("actual_ran_out_of_money")),
+                        "predicted_risk_pct": r.get("final_risk_score_predicted"),
+                        "spent_total": r.get("final_spent_total"),
+                        "notes": r.get("feedback_notes") or "",
+                        "status": t_info.get("status", "new"),
+                        "admin_note": t_info.get("admin_note", ""),
+                        "created_at": r.get("created_at"),
+                    })
+            except Exception as e:
+                print(f"[Supabase sync notice] admin_list_feedback: {e}")
+
+        if not items:
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT * FROM month_end_checkins ORDER BY created_at DESC LIMIT 200")
+                for r in cursor.fetchall():
+                    d = dict(r)
+                    fid = d["id"]
+                    t_info = triage_map.get(fid, {})
+                    items.append({
+                        "id": fid,
+                        "source": "month_end_checkin",
+                        "user_id": d.get("user_id"),
+                        "month": d.get("month"),
+                        "actual_ran_out_of_money": bool(d.get("actual_ran_out_of_money")),
+                        "predicted_risk_pct": d.get("final_risk_score_predicted"),
+                        "spent_total": d.get("final_spent_total"),
+                        "notes": d.get("feedback_notes") or "",
+                        "status": t_info.get("status", "new"),
+                        "admin_note": t_info.get("admin_note", ""),
+                        "created_at": d.get("created_at"),
+                    })
+        return items
+
+    def admin_update_feedback_status(self, item_id: str, status: str, admin_note: str = "") -> Dict[str, Any]:
+        triage_doc = self._get_global_doc("__admin_feedback_triage__")
+        statuses = triage_doc.get("statuses", {}) if isinstance(triage_doc, dict) else {}
+        statuses[item_id] = {
+            "status": status,
+            "admin_note": admin_note,
+            "updated_at": self._dhaka_now().strftime("%Y-%m-%d %H:%M:%S"),
+        }
+        self._save_global_doc("__admin_feedback_triage__", {"statuses": statuses})
+        return {"id": item_id, **statuses[item_id]}
+
+    def admin_get_announcements(self) -> List[Dict[str, Any]]:
+        doc = self._get_global_doc("__global_announcements__")
+        items = doc.get("announcements", [])
+        return items if isinstance(items, list) else []
+
+    def admin_save_announcement(self, title: str, message: str, is_active: bool = True) -> List[Dict[str, Any]]:
+        items = self.admin_get_announcements()
+        items.insert(0, {
+            "id": str(uuid.uuid4())[:8],
+            "title": title.strip(),
+            "message": message.strip(),
+            "is_active": bool(is_active),
+            "created_at": self._dhaka_now().strftime("%Y-%m-%d %H:%M:%S"),
+        })
+        self._save_global_doc("__global_announcements__", {"announcements": items[:20]})
+        return items[:20]
+
+    def admin_get_overview(self) -> Dict[str, Any]:
+        users = self.admin_list_all_users()
+        real_users = [u for u in users if u.get("id") not in ("demo_student_001", "guest_local_001")]
+        pro_count = sum(1 for u in real_users if u.get("is_pro"))
+        today_str = self._dhaka_now().strftime("%Y-%m-%d")
+        active_today = sum(1 for u in real_users if u.get("last_streak_date") == today_str)
+        streak_30_plus = sum(1 for u in real_users if (u.get("current_streak") or 0) >= 30)
+
+        payments = self.admin_list_payments()
+        pending_payments = sum(1 for p in payments if p.get("status") == "pending")
+        total_revenue = sum(float(p.get("amount") or 0) for p in payments if p.get("status") == "approved")
+
+        apps = self.admin_list_offer_applications()
+        pending_offer_apps = sum(1 for a in apps if a.get("status") == "pending")
+        feedback_items = self.admin_list_feedback()
+        winners = self._get_global_30_winners()
+
+        # Category breakdown & total volume from Supabase expenses
+        category_totals: Dict[str, float] = {}
+        total_expense_vol = 0.0
+        exp_count = 0
+        if self.supabase:
+            try:
+                exp_res = self.supabase.table("expenses").select("amount, category").limit(1000).execute()
+                for e in (exp_res.data or []):
+                    amt = float(e.get("amount") or 0)
+                    cat = e.get("category") or "Other"
+                    category_totals[cat] = round(category_totals.get(cat, 0.0) + amt, 2)
+                    total_expense_vol += amt
+                    exp_count += 1
+            except Exception as e:
+                print(f"[Supabase sync notice] admin_get_overview expenses: {e}")
+
+        return {
+            "total_users": len(real_users),
+            "pro_users": pro_count,
+            "free_users": max(0, len(real_users) - pro_count),
+            "active_today": active_today,
+            "streak_30_plus_users": streak_30_plus,
+            "first_100_claimed": len(winners),
+            "first_100_remaining": max(0, 100 - len(winners)),
+            "pending_payments": pending_payments,
+            "pending_offer_applications": pending_offer_apps,
+            "total_revenue_bdt": round(total_revenue, 2),
+            "total_expense_volume_bdt": round(total_expense_vol, 2),
+            "total_transactions": exp_count,
+            "total_feedback_records": len(feedback_items),
+            "category_breakdown": [{"category": k, "amount": v} for k, v in sorted(category_totals.items(), key=lambda x: x[1], reverse=True)],
+        }
 
 
 

@@ -9,6 +9,7 @@ import {
   StatusBar,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { THEME } from '../constants/theme';
 import { TRANSLATIONS, Language } from '../constants/translations';
 import { getStoredAppPin, authenticateWithBiometrics, isBiometricsAvailable } from '../services/security';
@@ -84,7 +85,7 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.lockBadge}>
-          <Text style={styles.lockIconText}>🔒</Text>
+          <Ionicons name="lock-closed" size={26} color={THEME.colors.primary} />
         </View>
         <Text style={styles.title}>{t.pinLockTitle}</Text>
         <Text style={styles.subtitle}>{t.pinLockSub}</Text>
@@ -157,7 +158,7 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({
             onPress={handleDelete}
             activeOpacity={0.7}
           >
-            <Text style={styles.keyAuxText}>⌫</Text>
+            <Ionicons name="backspace-outline" size={22} color="#CBD5E1" />
           </TouchableOpacity>
         </View>
       </View>

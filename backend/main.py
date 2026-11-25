@@ -21,9 +21,12 @@ from typing import Any, Dict, List, Optional
 import pandas as pd
 from fastapi import FastAPI, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
 
 from config import PORT, HOST, ENVIRONMENT, MODEL_PATH
 from database import db
+from admin_routes import router as admin_router
 from models import (
     UserRegisterRequest,
     UserLoginRequest,
@@ -115,6 +118,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(admin_router)
 
 
 # --- 1. SYSTEM HEALTH & METADATA ---
@@ -811,7 +816,8 @@ def get_user_dashboard(user_id: str):
         pro_info = db.check_pro_status(user_id)
         query_status = db.get_coach_query_status(user_id)
         active_goal = db.get_active_goal(user_id)
-        streak = db.get_and_update_streak(user_id)
+        streak_summary = db.get_streak_summary(user_id, check_in_today=True)
+        streak = int(streak_summary.get("current_streak", 0))
 
         return DashboardResponse(
             user_id=user_id,
@@ -847,7 +853,8 @@ def get_user_dashboard(user_id: str):
             coach_queries_remaining=query_status["queries_remaining"],
             coach_daily_limit=query_status["daily_limit"],
             active_goal=active_goal,
-            on_track_streak=streak
+            on_track_streak=streak,
+            streak_summary=streak_summary
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to load dashboard: {str(e)}")
@@ -1068,14 +1075,50 @@ def delete_goal(goal_id: str, user_id: str = Query(..., description="User ID own
         raise HTTPException(status_code=500, detail=f"Delete goal error: {str(e)}")
 
 
+@app.get("/api/streak/leaderboard")
+def get_streak_leaderboard_endpoint(user_id: Optional[str] = Query(None)):
+    """Returns Top 10 Streak Leaderboard, requesting user's rank, active streak offers, and user's applications."""
+    try:
+        lb = db.get_streak_leaderboard(user_id=user_id, limit=10)
+        offers = db.get_streak_offers(include_inactive=False)
+        apps = db.get_user_offer_applications(user_id) if user_id else []
+        return {**lb, "offers": offers, "applications": apps}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Leaderboard error: {str(e)}")
+
+
+@app.post("/api/streak/{user_id}/apply-offer")
+def apply_streak_offer_endpoint(user_id: str, offer_id: str = Query("offer_30d_smart_coach")):
+    """Allows eligible users (e.g. 30+ continuous streak days) to apply for the Smart Coach Pro offer."""
+    try:
+        app_record = db.apply_for_streak_offer(user_id, offer_id)
+        return {"status": "success", "application": app_record}
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Offer application error: {str(e)}")
+
+
 @app.get("/api/streak/{user_id}")
 def get_user_streak(user_id: str):
-    """Returns the user's consecutive days staying within safe daily spending limits."""
+    """Returns continuous streak, 7-day calendar status, 80% monthly target, and First-100 30-day challenge status."""
     try:
-        streak = db.get_and_update_streak(user_id)
-        return {"user_id": user_id, "on_track_streak": streak}
+        summary = db.get_streak_summary(user_id, check_in_today=True)
+        summary["on_track_streak"] = summary.get("current_streak", 0)
+        return summary
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Streak error: {str(e)}")
+
+
+@app.post("/api/streak/{user_id}/checkin")
+def checkin_user_streak(user_id: str):
+    """Explicit daily check-in endpoint updating continuous streak and First-100 milestone."""
+    try:
+        summary = db.get_streak_summary(user_id, check_in_today=True)
+        summary["on_track_streak"] = summary.get("current_streak", 0)
+        return summary
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Streak check-in error: {str(e)}")
 
 
 # --- 8.6 CAMPUS PEER DEBT & LENDING (দেনা-পাওনা / ধারের খাতা) ---
@@ -1361,6 +1404,11 @@ def submit_feedback(feedback: FeedbackRequest):
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Feedback recording error: {str(e)}")
+
+
+_admin_dist = Path(__file__).resolve().parent.parent / "admin-panel" / "dist"
+if _admin_dist.exists():
+    app.mount("/admin", StaticFiles(directory=str(_admin_dist), html=True), name="admin-panel")
 
 
 if __name__ == "__main__":

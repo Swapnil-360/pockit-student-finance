@@ -18,9 +18,10 @@ import { TRANSLATIONS, Language } from '../constants/translations';
 import { BRANDING } from '../constants/branding';
 import { BrandLogo } from '../components/BrandLogo';
 import { GlassCard } from '../components/GlassCard';
-import { DashboardData, UserData, SavingsGoal, toggleGoalPause } from '../services/api';
+import { DashboardData, UserData, SavingsGoal, StreakSummary, toggleGoalPause } from '../services/api';
 import { RiskDetailsModal } from '../components/RiskDetailsModal';
 import { FeatureWalkthroughModal } from '../components/FeatureWalkthroughModal';
+import { StreakDetailsModal } from '../components/StreakDetailsModal';
 import { TargetSavingsModal } from '../components/TargetSavingsModal';
 import { SavingsGoalCard } from '../components/SavingsGoalCard';
 import { CreateGoalModal } from '../components/CreateGoalModal';
@@ -82,6 +83,41 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const scrollRef = useRef<any>(null);
   const [riskDetailsVisible, setRiskDetailsVisible] = useState(false);
   const [walkthroughVisible, setWalkthroughVisible] = useState(false);
+  const [streakModalVisible, setStreakModalVisible] = useState(false);
+
+  const resolvedStreakSummary: StreakSummary = React.useMemo(() => {
+    if (dashboard.streak_summary) {
+      return dashboard.streak_summary;
+    }
+    const now = new Date();
+    const dow = now.getDay();
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const active = Math.max(1, dashboard.on_track_streak || 1);
+    const labels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+    return {
+      user_id: user.id,
+      current_streak: active,
+      longest_streak: active,
+      checked_in_today: true,
+      week_days: labels.map((lbl, idx) => {
+        const d = new Date(now);
+        d.setDate(now.getDate() - (dow - idx));
+        const isDone = idx <= dow && dow - idx < active;
+        const status = isDone ? 'completed' : idx === dow ? 'today' : idx < dow ? 'missed' : 'upcoming';
+        return { day_label: lbl, date: d.toISOString().substring(0, 10), status };
+      }),
+      monthly_completed_days: Math.min(daysInMonth, active),
+      monthly_total_days: daysInMonth,
+      monthly_target_days: Math.ceil(daysInMonth * 0.8),
+      monthly_pct: Number(((Math.min(daysInMonth, active) / daysInMonth) * 100).toFixed(1)),
+      monthly_80_unlocked: active >= Math.ceil(daysInMonth * 0.8),
+      reward_spots_total: 100,
+      reward_spots_claimed: 0,
+      reward_spots_remaining: 100,
+      user_30_day_rank: null,
+      reward_unlocked: false,
+    };
+  }, [dashboard.streak_summary, dashboard.on_track_streak, user.id]);
 
   const formatGreetingName = (fullName?: string): string => {
     if (!fullName) return 'Student';
@@ -297,8 +333,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         <View style={styles.greetingSection}>
           <Text style={[styles.greetingMainText, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
             {language === 'bn'
-              ? `হ্যালো, ${getCallingName(user.full_name, user.calling_name)} 👋`
-              : `Hello, ${getCallingName(user.full_name, user.calling_name)} 👋`}
+              ? `হ্যালো, ${getCallingName(user.full_name, user.calling_name)}`
+              : `Hello, ${getCallingName(user.full_name, user.calling_name)}`}
           </Text>
           <Text style={[styles.greetingSubText, { color: theme.textSecondary }]}>
             {language === 'bn' ? 'চলতি মাসে আর্থিক ট্র্যাকে থাকুন!' : 'Stay on track this month!'}
@@ -598,8 +634,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           )}
         </View>
 
-        {/* 6. Weekly Streak Card (Image 1 Style - Celebratory Sparkle & Perfectly Spaced Day Nodes) */}
-        <View
+        {/* 6. Continuous Streak & 80% / First-100 Challenge Card */}
+        <TouchableOpacity
           style={[
             styles.weeklyStreakCard,
             {
@@ -607,10 +643,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               borderColor: isDark ? 'rgba(16, 185, 129, 0.25)' : '#DCFCE7',
             },
           ]}
+          activeOpacity={0.85}
+          onPress={() => {
+            try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
+            setStreakModalVisible(true);
+          }}
         >
-          {/* Top-Right Celebration Sparkles Accent from Image 1 */}
           <View style={styles.streakSparkleBurst}>
-            <Ionicons name="sparkles" size={13} color="#EA580C" />
+            <Ionicons name="chevron-forward" size={14} color={isDark ? '#94A3B8' : '#64748B'} />
           </View>
 
           <View style={styles.streakLeftWrap}>
@@ -619,75 +659,70 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </View>
             <View style={styles.streakTextCol}>
               <Text style={[styles.streakTitle, { color: isDark ? '#F8FAFC' : '#0F172A' }]} numberOfLines={1}>
-                {language === 'bn' ? 'সাপ্তাহিক স্ট্রিক' : 'Weekly Streak'}
+                {resolvedStreakSummary.current_streak} {language === 'bn' ? 'দিন একটানা স্ট্রিক' : resolvedStreakSummary.current_streak === 1 ? 'day streak' : 'days streak'}
               </Text>
               <Text style={[styles.streakCount, { color: isDark ? '#CBD5E1' : '#334155' }]} numberOfLines={1}>
-                {dashboard.on_track_streak || 1} {language === 'bn' ? 'দিন একটানা' : 'days in a row'}
+                {language === 'bn'
+                  ? `মাসিক ৮০%: ${resolvedStreakSummary.monthly_completed_days}/${resolvedStreakSummary.monthly_target_days} দিন`
+                  : `80% Month: ${resolvedStreakSummary.monthly_completed_days}/${resolvedStreakSummary.monthly_target_days}d`}
               </Text>
-              <Text style={[styles.streakSub, { color: isDark ? '#94A3B8' : '#64748B' }]} numberOfLines={1}>
-                {language === 'bn' ? 'চালিয়ে যান!' : 'Keep going!'}
+              <Text style={[styles.streakSub, { color: '#EA580C', fontWeight: '600' }]} numberOfLines={1}>
+                {resolvedStreakSummary.reward_unlocked
+                  ? (language === 'bn' ? `র‍্যাংক #${resolvedStreakSummary.user_30_day_rank}/১০০ প্রো আনলকড` : `Rank #${resolvedStreakSummary.user_30_day_rank}/100 Pro Unlocked`)
+                  : (language === 'bn' ? `৩০ দিনে প্রো • ${resolvedStreakSummary.reward_spots_remaining}টি বাকি` : `30d Offer • ${resolvedStreakSummary.reward_spots_remaining} spots left`)}
               </Text>
             </View>
           </View>
 
           <View style={styles.streakDaysRow}>
-            {(() => {
-              const today = new Date();
-              const currentDayOfWeek = today.getDay(); // 0 = Sun, 1 = Mon, 2 = Tue, 3 = Wed, 4 = Thu, 5 = Fri, 6 = Sat
-              const activeStreak = Math.max(1, dashboard.on_track_streak || 1);
-              const days = [
-                { label: 'S', dayIndex: 0 },
-                { label: 'M', dayIndex: 1 },
-                { label: 'T', dayIndex: 2 },
-                { label: 'W', dayIndex: 3 },
-                { label: 'T', dayIndex: 4 },
-                { label: 'F', dayIndex: 5 },
-                { label: 'S', dayIndex: 6 },
-              ];
+            {(resolvedStreakSummary.week_days || []).map((d, idx) => {
+              const isChecked = d.status === 'completed';
+              const isMissed = d.status === 'missed';
+              const isToday = d.status === 'today';
 
-              return days.map((d, idx) => {
-                const isPastOrToday = idx <= currentDayOfWeek;
-                const isToday = idx === currentDayOfWeek;
-                // A day is checked if it falls within the active streak leading up to today
-                const isChecked = isPastOrToday && (currentDayOfWeek - idx < activeStreak);
-
-                return (
-                  <View key={idx} style={styles.streakDayNode}>
-                    <View
-                      style={[
-                        styles.streakDayDot,
-                        {
-                          backgroundColor: isChecked
-                            ? '#10B981'
-                            : (isDark ? 'rgba(255, 255, 255, 0.12)' : '#E2E8F0'),
-                          borderColor: isToday
-                            ? (isChecked ? '#059669' : '#10B981')
-                            : 'transparent',
-                          borderWidth: isToday ? 1.5 : 0,
-                        },
-                      ]}
-                    >
-                      {isChecked && <Ionicons name="checkmark" size={10} color="#FFFFFF" />}
-                    </View>
-                    <Text
-                      style={[
-                        styles.streakDayLabel,
-                        {
-                          color: isToday
-                            ? '#059669'
-                            : (isDark ? '#94A3B8' : '#64748B'),
-                          fontWeight: isToday ? '700' : '500',
-                        },
-                      ]}
-                    >
-                      {d.label}
-                    </Text>
+              return (
+                <View key={idx} style={styles.streakDayNode}>
+                  <View
+                    style={[
+                      styles.streakDayDot,
+                      {
+                        backgroundColor: isChecked
+                          ? '#10B981'
+                          : isMissed
+                          ? (isDark ? 'rgba(239, 68, 68, 0.16)' : '#FEE2E2')
+                          : (isDark ? 'rgba(255, 255, 255, 0.12)' : '#E2E8F0'),
+                        borderColor: isToday
+                          ? '#EA580C'
+                          : isMissed
+                          ? (isDark ? 'rgba(239, 68, 68, 0.4)' : '#FCA5A5')
+                          : 'transparent',
+                        borderWidth: isToday || isMissed ? 1.2 : 0,
+                      },
+                    ]}
+                  >
+                    {isChecked && <Ionicons name="checkmark" size={10} color="#FFFFFF" />}
+                    {isMissed && <Ionicons name="close" size={9} color="#EF4444" />}
                   </View>
-                );
-              });
-            })()}
+                  <Text
+                    style={[
+                      styles.streakDayLabel,
+                      {
+                        color: isChecked
+                          ? '#059669'
+                          : isToday
+                          ? '#EA580C'
+                          : (isDark ? '#94A3B8' : '#64748B'),
+                        fontWeight: isToday || isChecked ? '700' : '500',
+                      },
+                    ]}
+                  >
+                    {d.day_label}
+                  </Text>
+                </View>
+              );
+            })}
           </View>
-        </View>
+        </TouchableOpacity>
 
         {/* 7. Smart Tip Banner Card (Image 1 Style) */}
         <View
@@ -781,6 +816,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         userId={user.id}
         language={language}
         onSuccess={onRefresh}
+      />
+
+      {/* Continuous Streak, 80% Monthly & First-100 Challenge Modal */}
+      <StreakDetailsModal
+        visible={streakModalVisible}
+        onClose={() => setStreakModalVisible(false)}
+        language={language}
+        streakSummary={resolvedStreakSummary}
       />
     </View>
   );

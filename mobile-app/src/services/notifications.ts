@@ -94,7 +94,7 @@ export async function sendHighRiskAlertNotification(
 ): Promise<void> {
   if (Platform.OS === 'web') return;
   try {
-    const title = language === 'bn' ? '⚠️ উচ্চ আর্থিক ঝুঁকি সতর্কতা!' : '⚠️ High Financial Risk Alert!';
+    const title = language === 'bn' ? 'উচ্চ আর্থিক ঝুঁকি সতর্কতা!' : 'High Financial Risk Alert!';
     const body =
       language === 'bn'
         ? `আপনার ঝুঁকি স্কোর বেড়ে ${riskScore}% হয়েছে! মাস শেষ হওয়ার আগে বাজেট সংকটের তীব্র সম্ভাবনা। অপ্রয়োজনীয় খরচ এখনই সীমিত করুন।`

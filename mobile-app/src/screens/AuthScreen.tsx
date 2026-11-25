@@ -542,7 +542,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               <ActivityIndicator color={theme.textPrimary} size="small" />
             ) : (
               <Text style={[styles.demoActionText, { color: theme.textPrimary }]}>
-                {language === 'bn' ? '🚀 গেস্ট হিসেবে শুরু করুন' : '🚀 Continue as Guest'}
+                {language === 'bn' ? 'গেস্ট হিসেবে শুরু করুন' : 'Continue as Guest'}
               </Text>
             )}
           </TouchableOpacity>

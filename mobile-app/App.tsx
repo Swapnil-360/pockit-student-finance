@@ -463,6 +463,7 @@ function AppContent() {
           <ProfileScreen
             user={user}
             language={language}
+            initialStreak={dashboard?.streak_summary?.current_streak ?? dashboard?.on_track_streak}
             onToggleLanguage={toggleLanguage}
             onLogout={handleLogout}
             onOpenProModal={() => setProModalVisible(true)}
