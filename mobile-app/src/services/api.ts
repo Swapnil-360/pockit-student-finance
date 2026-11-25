@@ -2157,3 +2157,21 @@ export async function toggleMessMealSystem(userId: string, enableMessMeals: bool
   if (!res.ok) throw new Error(`Failed to toggle mess meal system: ${res.status}`);
   return await res.json();
 }
+
+export async function submitAppFeedback(payload: {
+  user_id: string;
+  category: string;
+  rating: number;
+  message: string;
+}): Promise<any> {
+  const res = await fetchWithTimeout(`${API_BASE_URL}/api/app-feedback`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  }, 20000);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `Failed to submit feedback: ${res.status}`);
+  }
+  return await res.json();
+}

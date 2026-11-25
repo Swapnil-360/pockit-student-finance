@@ -275,7 +275,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         ref={scrollRef}
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingTop: statusBarPad, paddingBottom: 140 + insets.bottom },
+          { paddingTop: 12, paddingBottom: 140 + insets.bottom },
         ]}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -649,28 +649,30 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             setStreakModalVisible(true);
           }}
         >
-          <View style={styles.streakSparkleBurst}>
-            <Ionicons name="chevron-forward" size={14} color={isDark ? '#94A3B8' : '#64748B'} />
-          </View>
-
-          <View style={styles.streakLeftWrap}>
-            <View style={styles.flameIconWrap}>
-              <Ionicons name="flame" size={20} color="#EA580C" />
+          <View style={styles.streakTopRow}>
+            <View style={styles.streakLeftWrap}>
+              <View style={styles.flameIconWrap}>
+                <Ionicons name="flame" size={20} color="#EA580C" />
+              </View>
+              <View style={styles.streakTextCol}>
+                <Text style={[styles.streakTitle, { color: isDark ? '#F8FAFC' : '#0F172A' }]} numberOfLines={1}>
+                  {resolvedStreakSummary.current_streak} {language === 'bn' ? 'দিন একটানা স্ট্রিক' : resolvedStreakSummary.current_streak === 1 ? 'day streak' : 'days streak'}
+                </Text>
+                <Text style={[styles.streakCount, { color: isDark ? '#CBD5E1' : '#334155' }]} numberOfLines={1}>
+                  {language === 'bn'
+                    ? `মাসিক ৮০%: ${resolvedStreakSummary.monthly_completed_days}/${resolvedStreakSummary.monthly_target_days} দিন`
+                    : `80% Month: ${resolvedStreakSummary.monthly_completed_days}/${resolvedStreakSummary.monthly_target_days}d`}
+                </Text>
+              </View>
             </View>
-            <View style={styles.streakTextCol}>
-              <Text style={[styles.streakTitle, { color: isDark ? '#F8FAFC' : '#0F172A' }]} numberOfLines={1}>
-                {resolvedStreakSummary.current_streak} {language === 'bn' ? 'দিন একটানা স্ট্রিক' : resolvedStreakSummary.current_streak === 1 ? 'day streak' : 'days streak'}
-              </Text>
-              <Text style={[styles.streakCount, { color: isDark ? '#CBD5E1' : '#334155' }]} numberOfLines={1}>
-                {language === 'bn'
-                  ? `মাসিক ৮০%: ${resolvedStreakSummary.monthly_completed_days}/${resolvedStreakSummary.monthly_target_days} দিন`
-                  : `80% Month: ${resolvedStreakSummary.monthly_completed_days}/${resolvedStreakSummary.monthly_target_days}d`}
-              </Text>
-              <Text style={[styles.streakSub, { color: '#EA580C', fontWeight: '600' }]} numberOfLines={1}>
+
+            <View style={styles.streakRightBadgeWrap}>
+              <Text style={[styles.streakSub, { color: '#EA580C', fontWeight: '700' }]} numberOfLines={1}>
                 {resolvedStreakSummary.reward_unlocked
-                  ? (language === 'bn' ? `র‍্যাংক #${resolvedStreakSummary.user_30_day_rank}/১০০ প্রো আনলকড` : `Rank #${resolvedStreakSummary.user_30_day_rank}/100 Pro Unlocked`)
-                  : (language === 'bn' ? `৩০ দিনে প্রো • ${resolvedStreakSummary.reward_spots_remaining}টি বাকি` : `30d Offer • ${resolvedStreakSummary.reward_spots_remaining} spots left`)}
+                  ? (language === 'bn' ? `#${resolvedStreakSummary.user_30_day_rank}/১০০ প্রো` : `#${resolvedStreakSummary.user_30_day_rank}/100 Pro`)
+                  : (language === 'bn' ? `${resolvedStreakSummary.reward_spots_remaining}টি বাকি` : `${resolvedStreakSummary.reward_spots_remaining} spots left`)}
               </Text>
+              <Ionicons name="chevron-forward" size={15} color={isDark ? '#94A3B8' : '#64748B'} />
             </View>
           </View>
 
@@ -1108,21 +1110,30 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 14,
     marginBottom: 14,
+    flexDirection: 'column',
+    gap: 12,
+  },
+  streakTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    position: 'relative',
+    gap: 8,
   },
-  streakSparkleBurst: {
-    position: 'absolute',
-    top: 8,
-    right: 10,
+  streakRightBadgeWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    flexShrink: 0,
+    backgroundColor: 'rgba(234, 88, 12, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
   },
   streakLeftWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    flexShrink: 1,
-    marginRight: 4,
+    flex: 1,
+    minWidth: 0,
   },
   flameIconWrap: {
     width: 36,
@@ -1134,10 +1145,12 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   streakTextCol: {
-    marginLeft: 8,
+    marginLeft: 10,
+    flex: 1,
+    minWidth: 0,
   },
   streakTitle: {
-    fontSize: 13,
+    fontSize: 13.5,
     fontWeight: '700',
   },
   streakCount: {
@@ -1147,13 +1160,14 @@ const styles = StyleSheet.create({
   },
   streakSub: {
     fontSize: 10.5,
-    fontWeight: '400',
+    fontWeight: '600',
   },
   streakDaysRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    flexShrink: 0,
+    justifyContent: 'space-between',
+    width: '100%',
+    paddingHorizontal: 4,
   },
   streakDayNode: {
     alignItems: 'center',

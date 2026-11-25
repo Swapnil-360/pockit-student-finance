@@ -51,6 +51,13 @@ export const ExportsAndSettingsPage: React.FC = () => {
       file: 'pockit_transactions',
     },
     {
+      name: 'User App Feedback & Bug Reports Dataset',
+      desc: 'In-app user feedback, star ratings, categories, and month-end outcome notes with triage status.',
+      csv: '/api/admin/export/feedback?format=csv',
+      json: '/api/admin/export/feedback?format=json',
+      file: 'pockit_feedback_dataset',
+    },
+    {
       name: 'ML Retraining Dataset',
       desc: 'Month-end student check-ins formatted directly for scikit-learn retraining.',
       csv: '/api/admin/export/retraining?format=csv',

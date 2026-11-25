@@ -175,21 +175,36 @@ export const GoalsScreen: React.FC<GoalsScreenProps> = ({
         style={[
           styles.header,
           {
-            paddingTop: Math.max(insets.top, 16) + 10,
-            backgroundColor: isDark ? 'rgba(18, 20, 23, 0.95)' : 'rgba(238, 243, 247, 0.9)',
-            borderBottomColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(83, 122, 150, 0.12)',
+            paddingTop: 12,
+            paddingBottom: 12,
+            backgroundColor: 'transparent',
+            borderBottomColor: 'transparent',
           },
         ]}
       >
-        <View>
-          <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>
-            {language === 'bn' ? 'স্বপ্নের সঞ্চয় ভল্ট' : 'Dream Goal Vault'}
-          </Text>
-          <Text style={[styles.headerSubtitle, { color: theme.textSecondary }]}>
-            {language === 'bn'
-              ? 'নির্ধারিত লক্ষ্য ও মাসিক সঞ্চয় ট্র্যাকিং'
-              : 'Target savings ring-fenced from impulse spend'}
-          </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, paddingRight: 10 }}>
+          <View
+            style={{
+              width: 38,
+              height: 38,
+              borderRadius: 12,
+              backgroundColor: isDark ? 'rgba(244, 123, 78, 0.16)' : '#FFF7ED',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Ionicons name="trophy-outline" size={20} color={theme.primaryAccent} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.headerTitle, { color: theme.textPrimary, fontSize: 22, fontWeight: '800', letterSpacing: -0.4 }]}>
+              {language === 'bn' ? 'স্বপ্নের সঞ্চয় ভল্ট' : 'Dream Goal Vault'}
+            </Text>
+            <Text style={[styles.headerSubtitle, { color: theme.textSecondary, fontSize: 12.5 }]} numberOfLines={1}>
+              {language === 'bn'
+                ? 'নির্ধারিত লক্ষ্য ও মাসিক সঞ্চয় ট্র্যাকিং'
+                : 'Target savings ring-fenced from impulse spend'}
+            </Text>
+          </View>
         </View>
 
         <TouchableOpacity

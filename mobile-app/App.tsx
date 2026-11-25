@@ -6,12 +6,14 @@ import {
   StyleSheet,
   TouchableOpacity,
   Platform,
+  Alert,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import * as Updates from 'expo-updates';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { THEME } from './src/constants/theme';
 import { ThemeProvider, useTheme } from './src/constants/ThemeContext';
 import { TRANSLATIONS, Language } from './src/constants/translations';
@@ -96,6 +98,31 @@ function AppContent() {
         document.head.appendChild(link);
       }
     }
+  }, []);
+
+  // Silent OTA update check on native preview/production builds
+  useEffect(() => {
+    if (Platform.OS === 'web' || __DEV__ || !Updates.isEnabled) return;
+    (async () => {
+      try {
+        const check = await Updates.checkForUpdateAsync();
+        if (check.isAvailable) {
+          const fetched = await Updates.fetchUpdateAsync();
+          if (fetched.isNew) {
+            Alert.alert(
+              'Update Ready',
+              'A new version of Pockit has been downloaded. Restart now to apply the update.',
+              [
+                { text: 'Later', style: 'cancel' },
+                { text: 'Restart Now', onPress: () => Updates.reloadAsync().catch(() => {}) },
+              ]
+            );
+          }
+        }
+      } catch {
+        // Ignore offline/update check failures silently
+      }
+    })();
   }, []);
 
   // Load language preference on launch (default to 'en')
@@ -410,7 +437,7 @@ function AppContent() {
       <AmbientGlowBackground />
 
       {/* Screen Views */}
-      <View style={styles.screenContainer}>
+      <SafeAreaView style={styles.screenContainer} edges={['top']}>
         {activeTab === 'home' && (
           <HomeScreen
             user={user}
@@ -479,7 +506,7 @@ function AppContent() {
             }}
           />
         )}
-      </View>
+      </SafeAreaView>
 
       {/* Floating Bottom Navigation Bar (4 Scandinavian Tabs + Prominent Center '+' Button) */}
       <View

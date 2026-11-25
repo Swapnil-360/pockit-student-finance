@@ -35,6 +35,7 @@ import {
   deleteAccountApi,
   fetchStreak,
   fetchStreakLeaderboard,
+  submitAppFeedback,
   UserData,
 } from '../services/api';
 import { scheduleDailySpendingReminder } from '../services/notifications';
@@ -116,6 +117,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   const [notes, setNotes] = useState('');
   const [submittingCheckin, setSubmittingCheckin] = useState(false);
   const [checkinDone, setCheckinDone] = useState(false);
+  const [feedbackModalVisible, setFeedbackModalVisible] = useState(false);
+  const [fbCategory, setFbCategory] = useState<'General' | 'Bug Report' | 'Feature Idea' | 'Smart Coach'>('General');
+  const [fbRating, setFbRating] = useState<number>(5);
+  const [fbMessage, setFbMessage] = useState('');
+  const [submittingFeedback, setSubmittingFeedback] = useState(false);
 
   const t = TRANSLATIONS[language];
   const statusBarPad = Math.max(insets.top, Platform.OS === 'android' ? (StatusBar.currentHeight || 36) : 44) + 8;
@@ -483,7 +489,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
       <ScrollView
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingTop: statusBarPad, paddingBottom: 140 + insets.bottom },
+          { paddingTop: 12, paddingBottom: 140 + insets.bottom },
         ]}
         showsVerticalScrollIndicator={false}
       >
@@ -1134,7 +1140,34 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           )}
         </GlassCard>
 
-        {/* 9. Account Actions & Session Control */}
+        {/* 9. Send Feedback & Bug Report Card */}
+        <GlassCard style={styles.sectionCard}>
+          <TouchableOpacity
+            style={styles.cardHeaderRow}
+            onPress={() => {
+              try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
+              setFeedbackModalVisible(true);
+            }}
+            activeOpacity={0.75}
+          >
+            <View style={[styles.iconBox, { backgroundColor: isDark ? 'rgba(244, 123, 78, 0.16)' : '#FFF7ED' }]}>
+              <Ionicons name="chatbox-ellipses-outline" size={18} color="#F47B4E" />
+            </View>
+            <View style={styles.headerTextCol}>
+              <Text style={[styles.itemTitle, { color: theme.textPrimary }]}>
+                {language === 'bn' ? 'মতামত ও সমস্যা জানান' : 'Send Feedback & Bug Report'}
+              </Text>
+              <Text style={[styles.itemSub, { color: theme.textSecondary }]}>
+                {language === 'bn'
+                  ? 'অ্যাপের উন্নতি বা সমস্যার কথা সরাসরি আমাদের জানান'
+                  : 'Share suggestions, rate Pockit, or report any issue'}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={theme.textMuted} />
+          </TouchableOpacity>
+        </GlassCard>
+
+        {/* 10. Account Actions & Session Control */}
         <View style={styles.accountActionSection}>
           {/* Sign Out (Sleek Clean Secondary Pill) */}
           <TouchableOpacity
@@ -1175,6 +1208,148 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* FEEDBACK MODAL */}
+      <Modal
+        visible={feedbackModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setFeedbackModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View
+            style={{
+              backgroundColor: theme.surface,
+              borderColor: theme.border,
+              borderWidth: 1,
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+              paddingHorizontal: 20,
+              paddingTop: 20,
+              paddingBottom: 28,
+            }}
+          >
+            <View style={styles.modalHeaderRow}>
+              <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>
+                {language === 'bn' ? 'অ্যাপ ফিডব্যাক' : 'App Feedback'}
+              </Text>
+              <TouchableOpacity onPress={() => setFeedbackModalVisible(false)}>
+                <Ionicons name="close" size={22} color={theme.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={[styles.inputLabel, { color: theme.textSecondary, marginTop: 8 }]}>
+              {language === 'bn' ? 'বিষয়' : 'Category'}
+            </Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 6, marginBottom: 14 }}>
+              {(['General', 'Bug Report', 'Feature Idea', 'Smart Coach'] as const).map((cat) => {
+                const active = fbCategory === cat;
+                return (
+                  <TouchableOpacity
+                    key={cat}
+                    onPress={() => setFbCategory(cat)}
+                    style={{
+                      paddingHorizontal: 12,
+                      paddingVertical: 7,
+                      borderRadius: 999,
+                      backgroundColor: active ? '#F47B4E' : (isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9'),
+                    }}
+                  >
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: active ? '#FFFFFF' : theme.textSecondary }}>
+                      {cat}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>
+              {language === 'bn' ? 'রেটিং' : 'Rating'}
+            </Text>
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 6, marginBottom: 14 }}>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <TouchableOpacity key={star} onPress={() => setFbRating(star)}>
+                  <Ionicons
+                    name={star <= fbRating ? 'star' : 'star-outline'}
+                    size={26}
+                    color={star <= fbRating ? '#F59E0B' : theme.textMuted}
+                  />
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>
+              {language === 'bn' ? 'আপনার বার্তা' : 'Your Message'}
+            </Text>
+            <TextInput
+              style={{
+                color: theme.textPrimary,
+                backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#F8FAFC',
+                borderColor: theme.border,
+                borderWidth: 1,
+                borderRadius: 14,
+                paddingHorizontal: 14,
+                height: 96,
+                textAlignVertical: 'top',
+                paddingTop: 10,
+                marginTop: 6,
+                fontSize: 14,
+              }}
+              multiline
+              placeholder={language === 'bn' ? 'আপনার মতামত বা সমস্যার বিবরণ লিখুন...' : 'Write your feedback or describe an issue...'}
+              placeholderTextColor={theme.textMuted}
+              value={fbMessage}
+              onChangeText={setFbMessage}
+            />
+
+            <TouchableOpacity
+              style={{
+                backgroundColor: '#F47B4E',
+                marginTop: 16,
+                borderRadius: 14,
+                paddingVertical: 14,
+                alignItems: 'center',
+                justifyContent: 'center',
+                opacity: submittingFeedback ? 0.6 : 1,
+              }}
+              disabled={submittingFeedback}
+              onPress={async () => {
+                if (!fbMessage.trim()) {
+                  Alert.alert('Required', language === 'bn' ? 'অনুগ্রহ করে আপনার বার্তা লিখুন।' : 'Please enter your feedback message.');
+                  return;
+                }
+                setSubmittingFeedback(true);
+                try {
+                  await submitAppFeedback({
+                    user_id: currentUser.id,
+                    category: fbCategory,
+                    rating: fbRating,
+                    message: fbMessage.trim(),
+                  });
+                  setFbMessage('');
+                  setFeedbackModalVisible(false);
+                  Alert.alert(
+                    language === 'bn' ? 'ধন্যবাদ!' : 'Thank You!',
+                    language === 'bn' ? 'আপনার মতামত সফলভাবে পাঠানো হয়েছে।' : 'Your feedback has been submitted and saved.'
+                  );
+                } catch (e: any) {
+                  Alert.alert('Error', e.message || 'Failed to submit feedback.');
+                } finally {
+                  setSubmittingFeedback(false);
+                }
+              }}
+            >
+              {submittingFeedback ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '700' }}>
+                  {language === 'bn' ? 'ফিডব্যাক পাঠান' : 'Submit Feedback'}
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* EDIT PROFILE MODAL */}
       <Modal

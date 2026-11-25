@@ -4,7 +4,15 @@
     "slug": "pockit",
     "scheme": "pockit",
     "description": "Pockit — Student Money & Financial Risk Coach",
-    "version": "2.0.0",
+    "version": "2.0.1",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/e0b321f7-1d2b-4903-b8e3-96a8f025eeb4",
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    },
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",

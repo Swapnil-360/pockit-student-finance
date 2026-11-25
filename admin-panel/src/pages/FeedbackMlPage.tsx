@@ -35,13 +35,29 @@ export const FeedbackMlPage: React.FC = () => {
           </p>
         </div>
 
-        <button
-          onClick={() => downloadExportFile('/api/admin/export/retraining?format=csv', 'pockit_retraining_dataset.csv')}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#F47B4E] text-white text-xs font-semibold cursor-pointer"
-        >
-          <Download className="w-4 h-4" />
-          Export Retraining CSV
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => downloadExportFile('/api/admin/export/feedback?format=csv', 'pockit_feedback_dataset.csv')}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-slate-200 text-xs font-semibold cursor-pointer"
+          >
+            <Download className="w-4 h-4" />
+            Export Feedback CSV
+          </button>
+          <button
+            onClick={() => downloadExportFile('/api/admin/export/feedback?format=json', 'pockit_feedback_dataset.json')}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-slate-200 text-xs font-semibold cursor-pointer"
+          >
+            <Download className="w-4 h-4" />
+            Feedback JSON
+          </button>
+          <button
+            onClick={() => downloadExportFile('/api/admin/export/retraining?format=csv', 'pockit_retraining_dataset.csv')}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#F47B4E] text-white text-xs font-semibold cursor-pointer"
+          >
+            <Download className="w-4 h-4" />
+            Export Retraining CSV
+          </button>
+        </div>
       </div>
 
       {/* ML Model Summary */}
@@ -76,10 +92,10 @@ export const FeedbackMlPage: React.FC = () => {
         <table className="w-full text-left text-xs">
           <thead className="border-b border-white/8 text-slate-400 uppercase tracking-wider">
             <tr>
-              <th className="py-3.5 px-4">Month</th>
-              <th className="py-3.5 px-4">Predicted Risk</th>
-              <th className="py-3.5 px-4">Actual Ran Out?</th>
-              <th className="py-3.5 px-4">Student Note</th>
+              <th className="py-3.5 px-4">Source / Date</th>
+              <th className="py-3.5 px-4">Student / Risk</th>
+              <th className="py-3.5 px-4">Category / Outcome</th>
+              <th className="py-3.5 px-4">Message / Note</th>
               <th className="py-3.5 px-4">Triage</th>
               <th className="py-3.5 px-4 text-right">Action</th>
             </tr>
@@ -94,20 +110,40 @@ export const FeedbackMlPage: React.FC = () => {
             ) : (
               items.map((item) => (
                 <tr key={item.id} className="hover:bg-white/[0.02]">
-                  <td className="py-3 px-4 font-semibold text-slate-200">{item.month || '-'}</td>
-                  <td className="py-3 px-4 text-slate-300">{item.predicted_risk_pct ?? 0}%</td>
                   <td className="py-3 px-4">
-                    <span
-                      className={`px-2 py-0.5 rounded-full font-semibold ${
-                        item.actual_ran_out_of_money
-                          ? 'bg-rose-500/15 text-rose-400'
-                          : 'bg-emerald-500/15 text-emerald-400'
-                      }`}
-                    >
-                      {item.actual_ran_out_of_money ? 'Yes (Ran Out)' : 'No (Safe)'}
-                    </span>
+                    <div className="font-semibold text-slate-200">
+                      {item.source === 'app_feedback' ? 'App Feedback' : item.month || '-'}
+                    </div>
+                    <div className="text-[11px] text-slate-400">{item.created_at || item.month || ''}</div>
                   </td>
-                  <td className="py-3 px-4 text-slate-300 max-w-xs truncate">{item.notes || '-'}</td>
+                  <td className="py-3 px-4 text-slate-300">
+                    {item.source === 'app_feedback' ? (
+                      <div>
+                        <div className="font-medium text-slate-200">{item.user_name || 'Student'}</div>
+                        <div className="text-[11px] text-slate-400">{item.user_email || item.user_id}</div>
+                      </div>
+                    ) : (
+                      <span>{item.predicted_risk_pct ?? 0}% risk</span>
+                    )}
+                  </td>
+                  <td className="py-3 px-4">
+                    {item.source === 'app_feedback' ? (
+                      <span className="px-2 py-0.5 rounded-full font-semibold bg-amber-500/15 text-amber-400">
+                        {item.category || 'General'} • {item.rating ?? 5}/5
+                      </span>
+                    ) : (
+                      <span
+                        className={`px-2 py-0.5 rounded-full font-semibold ${
+                          item.actual_ran_out_of_money
+                            ? 'bg-rose-500/15 text-rose-400'
+                            : 'bg-emerald-500/15 text-emerald-400'
+                        }`}
+                      >
+                        {item.actual_ran_out_of_money ? 'Yes (Ran Out)' : 'No (Safe)'}
+                      </span>
+                    )}
+                  </td>
+                  <td className="py-3 px-4 text-slate-300 max-w-xs">{item.notes || '-'}</td>
                   <td className="py-3 px-4">
                     <span className="px-2.5 py-0.5 rounded-full bg-white/5 text-slate-300 font-semibold">
                       {item.status}

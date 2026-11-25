@@ -391,7 +391,7 @@ export const CalendarLedgerScreen: React.FC<CalendarLedgerScreenProps> = ({
           styles.curvedHeaderBlock,
           {
             backgroundColor: theme.headerBlock,
-            paddingTop: statusBarPad,
+            paddingTop: 12,
           },
         ]}
       >

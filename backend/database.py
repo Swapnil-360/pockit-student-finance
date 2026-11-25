@@ -997,16 +997,32 @@ class Database:
         return avatar_url
 
     def update_target_savings(self, user_id: str, target_savings: float) -> bool:
-        """Directly updates the protected target savings goal."""
+        """Directly updates the protected target savings goal in SQLite and Supabase Cloud."""
+        val = max(0.0, float(target_savings))
+        self.get_profile(user_id)
+        updated = False
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
                 UPDATE profiles
-                SET target_savings = ?, updated_at = CURRENT_TIMESTAMP
+                SET target_savings = ?, savings_goal_fixed = ?, updated_at = CURRENT_TIMESTAMP
                 WHERE user_id = ?
-            """, (max(0.0, target_savings), user_id))
+            """, (val, val, user_id))
             conn.commit()
-            return cursor.rowcount > 0
+            updated = cursor.rowcount > 0
+
+        if self.supabase:
+            try:
+                sb_uid = self._to_uuid(user_id)
+                self.supabase.table('profiles').update({
+                    'target_savings': val,
+                    'savings_goal_fixed': val,
+                }).eq('user_id', sb_uid).execute()
+                self._save_user_settings_to_supabase(user_id, {'target_savings': val})
+            except Exception as e:
+                print(f"[Supabase sync notice] update_target_savings: {e}")
+
+        return updated
 
     def get_coach_query_status(self, user_id: str) -> Dict[str, Any]:
         """Returns the daily fair-use query limit status (10 queries/day, resetting at midnight)."""
@@ -1307,7 +1323,7 @@ class Database:
                     sb_prof = res.data[0]
                     extra_settings = self._get_user_settings_from_supabase(user_id)
                     if extra_settings:
-                        for k in ('mess_meal_fixed', 'academic_fee_fixed', 'transport_fixed', 'enable_mess_meals', 'estimated_meal_rate'):
+                        for k in ('mess_meal_fixed', 'academic_fee_fixed', 'transport_fixed', 'enable_mess_meals', 'estimated_meal_rate', 'target_savings'):
                             if k in extra_settings and extra_settings[k] is not None:
                                 sb_prof[k] = extra_settings[k]
                     self._restore_profile_to_sqlite(user_id, sb_prof)
@@ -3609,18 +3625,60 @@ class Database:
             self.admin_set_pro_status(target["user_id"], status == "approved", days=30)
         return target
 
+    def submit_app_feedback(
+        self,
+        user_id: str,
+        category: str,
+        rating: int,
+        message: str,
+    ) -> Dict[str, Any]:
+        doc = self._get_global_doc("__user_app_feedback__")
+        items = doc.get("items", []) if isinstance(doc, dict) else []
+        user = self.get_user(user_id) or {}
+        now_dt = self._dhaka_now()
+        entry = {
+            "id": str(uuid.uuid4()),
+            "source": "app_feedback",
+            "user_id": user_id,
+            "user_email": user.get("email", ""),
+            "user_name": user.get("full_name") or user.get("calling_name") or "Student",
+            "month": now_dt.strftime("%Y-%m"),
+            "category": (category or "General").strip(),
+            "rating": max(1, min(5, int(rating or 5))),
+            "notes": (message or "").strip(),
+            "actual_ran_out_of_money": None,
+            "predicted_risk_pct": None,
+            "created_at": now_dt.strftime("%Y-%m-%d %H:%M:%S"),
+        }
+        items.insert(0, entry)
+        self._save_global_doc("__user_app_feedback__", {"items": items[:500]})
+        return entry
+
     def admin_list_feedback(self) -> List[Dict[str, Any]]:
         items: List[Dict[str, Any]] = []
         triage_doc = self._get_global_doc("__admin_feedback_triage__")
         triage_map = triage_doc.get("statuses", {}) if isinstance(triage_doc, dict) else {}
 
+        # 1. In-app user feedback submissions
+        app_fb_doc = self._get_global_doc("__user_app_feedback__")
+        for r in (app_fb_doc.get("items", []) if isinstance(app_fb_doc, dict) else []):
+            fid = r.get("id")
+            t_info = triage_map.get(fid, {})
+            items.append({
+                **r,
+                "status": t_info.get("status", "new"),
+                "admin_note": t_info.get("admin_note", ""),
+            })
+
+        # 2. Month-end check-in ML feedback rows
+        checkin_items: List[Dict[str, Any]] = []
         if self.supabase:
             try:
                 res = self.supabase.table("month_end_checkins").select("*").order("created_at", desc=True).limit(200).execute()
                 for r in (res.data or []):
                     fid = r.get("id")
                     t_info = triage_map.get(fid, {})
-                    items.append({
+                    checkin_items.append({
                         "id": fid,
                         "source": "month_end_checkin",
                         "user_id": r.get("user_id"),
@@ -3636,7 +3694,7 @@ class Database:
             except Exception as e:
                 print(f"[Supabase sync notice] admin_list_feedback: {e}")
 
-        if not items:
+        if not checkin_items:
             with self._get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute("SELECT * FROM month_end_checkins ORDER BY created_at DESC LIMIT 200")
@@ -3644,7 +3702,7 @@ class Database:
                     d = dict(r)
                     fid = d["id"]
                     t_info = triage_map.get(fid, {})
-                    items.append({
+                    checkin_items.append({
                         "id": fid,
                         "source": "month_end_checkin",
                         "user_id": d.get("user_id"),
@@ -3657,6 +3715,8 @@ class Database:
                         "admin_note": t_info.get("admin_note", ""),
                         "created_at": d.get("created_at"),
                     })
+        items.extend(checkin_items)
+        items.sort(key=lambda x: str(x.get("created_at") or ""), reverse=True)
         return items
 
     def admin_update_feedback_status(self, item_id: str, status: str, admin_note: str = "") -> Dict[str, Any]:

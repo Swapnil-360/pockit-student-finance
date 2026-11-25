@@ -148,56 +148,24 @@ export const ProSubscriptionModal: React.FC<ProSubscriptionModalProps> = ({
               </View>
             </View>
 
-            {/* Payment Method Selector */}
-            <Text style={styles.sectionTitle}>
-              {language === 'bn' ? 'পেমেন্ট মাধ্যম বেছে নিন' : 'Select Payment Method'}
-            </Text>
-            <View style={styles.methodSelector}>
-              {(['bKash', 'Nagad', 'Rocket'] as const).map((method) => (
-                <TouchableOpacity
-                  key={method}
-                  style={[
-                    styles.methodChip,
-                    paymentMethod === method && styles.methodChipActive,
-                  ]}
-                  onPress={() => setPaymentMethod(method)}
-                  activeOpacity={0.8}
-                >
-                  <Text
-                    style={[
-                      styles.methodChipText,
-                      paymentMethod === method && styles.methodChipTextActive,
-                    ]}
-                  >
-                    {method}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            {/* Instructions */}
+            {/* Payment Coming Soon Card */}
             <View style={styles.instructionsCard}>
-              <Text style={styles.instructionsTitle}>{t.paymentInstructionsTitle}</Text>
-              <Text style={styles.instructionsBody}>{t.paymentInstructions}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                <Ionicons name="time-outline" size={18} color="#F59E0B" />
+                <Text style={styles.instructionsTitle}>
+                  {language === 'bn' ? 'অনলাইন পেমেন্ট শীঘ্রই আসছে' : 'Pro Payments Coming Soon'}
+                </Text>
+              </View>
+              <Text style={styles.instructionsBody}>
+                {language === 'bn'
+                  ? 'bKash, Nagad ও Rocket পেমেন্ট সিস্টেম খুব শীঘ্রই চালু হবে। এর মধ্যে টানা ৩০ দিনের স্ট্রিক চ্যালেঞ্জ সম্পন্ন করে ৩০ দিনের ফ্রি স্মার্ট কোচ প্রো-এর জন্য আবেদন করতে পারেন।'
+                  : 'bKash, Nagad, and Rocket checkout is launching soon. Meanwhile, complete the 30-day continuous streak challenge to apply for 30 days of Smart Coach Pro for free.'}
+              </Text>
             </View>
 
-            {/* TrxID Input */}
-            <Text style={styles.inputLabel}>{t.trxIdLabel}</Text>
-            <TextInput
-              style={styles.input}
-              placeholder={t.trxIdPlaceholder}
-              placeholderTextColor={THEME.colors.textMuted}
-              value={trxId}
-              onChangeText={setTrxId}
-              autoCapitalize="characters"
-              autoCorrect={false}
-            />
-
-            {/* Submit Verification Button */}
             <TouchableOpacity
-              style={[styles.verifyBtnWrap, submitting && styles.btnDisabled]}
-              onPress={handleVerifyTrx}
-              disabled={submitting}
+              style={styles.verifyBtnWrap}
+              onPress={onClose}
               activeOpacity={0.85}
             >
               <LinearGradient
@@ -206,14 +174,12 @@ export const ProSubscriptionModal: React.FC<ProSubscriptionModalProps> = ({
                 end={{ x: 1, y: 0 }}
                 style={styles.verifyGradientBtn}
               >
-                {submitting ? (
-                  <ActivityIndicator color="#0D1117" />
-                ) : (
-                  <View style={styles.btnContentRow}>
-                    <Text style={styles.verifyBtnText}>{t.verifyTrxBtn}</Text>
-                    <Ionicons name="checkmark-circle" size={16} color="#0D1117" style={{ marginLeft: 6 }} />
-                  </View>
-                )}
+                <View style={styles.btnContentRow}>
+                  <Text style={styles.verifyBtnText}>
+                    {language === 'bn' ? 'ঠিক আছে' : 'Got It'}
+                  </Text>
+                  <Ionicons name="checkmark-circle" size={16} color="#0D1117" style={{ marginLeft: 6 }} />
+                </View>
               </LinearGradient>
             </TouchableOpacity>
           </ScrollView>

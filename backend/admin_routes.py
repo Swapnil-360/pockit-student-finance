@@ -345,6 +345,12 @@ def admin_export_retraining(format: str = Query("csv"), admin=Depends(require_ad
     return _export_response(rows, "pockit_retraining_dataset", format)
 
 
+@router.get("/export/feedback")
+def admin_export_feedback(format: str = Query("csv"), admin=Depends(require_admin)):
+    rows = db.admin_list_feedback()
+    return _export_response(rows, "pockit_feedback_dataset", format)
+
+
 @router.get("/export/streak-winners")
 def admin_export_streak_winners(format: str = Query("csv"), admin=Depends(require_admin)):
     winners = db._get_global_30_winners()

@@ -1386,6 +1386,18 @@ def predict_financial_risk(student: StudentInput):
         raise HTTPException(status_code=500, detail=f"Prediction error: {str(e)}")
 
 
+@app.post("/api/app-feedback")
+def submit_app_feedback_endpoint(req: Dict[str, Any]):
+    user_id = str(req.get("user_id") or "").strip()
+    message = str(req.get("message") or "").strip()
+    if not user_id or not message:
+        raise HTTPException(status_code=400, detail="user_id and message are required")
+    category = str(req.get("category") or "General")
+    rating = int(req.get("rating") or 5)
+    entry = db.submit_app_feedback(user_id=user_id, category=category, rating=rating, message=message)
+    return {"status": "success", "feedback": entry}
+
+
 @app.post("/feedback", response_model=FeedbackResponse)
 def submit_feedback(feedback: FeedbackRequest):
     try:

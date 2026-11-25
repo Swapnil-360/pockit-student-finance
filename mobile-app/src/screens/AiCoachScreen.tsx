@@ -231,26 +231,44 @@ export const AiCoachScreen: React.FC<AiCoachScreenProps> = ({
   return (
     <View style={[styles.container, { backgroundColor: theme.canvas }]}>
       <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingTop: statusBarPad, paddingBottom: 140 + insets.bottom }]}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: 12, paddingBottom: 140 + insets.bottom }]}
         showsVerticalScrollIndicator={false}
       >
         {/* Top Header */}
-        <View style={styles.header}>
-          <View style={styles.headerTitleRow}>
-            <Text style={[styles.screenTitle, { color: theme.textPrimary }]}>{t.aiCoachTitle}</Text>
-            {isPro ? (
-              <View style={[styles.proActiveBadge, { backgroundColor: theme.powder, borderColor: theme.headerBlock }]}>
-                <Ionicons name="shield-checkmark" size={12} color={theme.primary} />
-                <Text style={[styles.proActiveBadgeText, { color: theme.primary }]}>PRO ACTIVE</Text>
-              </View>
-            ) : (
-              <View style={[styles.proLockBadge, { backgroundColor: isDark ? '#263B4D' : '#D5E4EF', borderColor: theme.borderMedium }]}>
-                <Ionicons name="lock-closed" size={12} color={theme.primary} />
-                <Text style={[styles.proLockBadgeText, { color: theme.primary }]}>PREMIUM</Text>
-              </View>
-            )}
+        <View style={[styles.header, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, paddingRight: 8 }}>
+            <View
+              style={{
+                width: 38,
+                height: 38,
+                borderRadius: 12,
+                backgroundColor: isDark ? 'rgba(244, 123, 78, 0.16)' : '#FFF7ED',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Ionicons name="compass-outline" size={20} color={theme.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.screenTitle, { color: theme.textPrimary, fontSize: 22, fontWeight: '800', letterSpacing: -0.4 }]} numberOfLines={1}>
+                {t.aiCoachTitle}
+              </Text>
+              <Text style={[styles.screenSubtitle, { color: theme.textSecondary, fontSize: 12.5, marginTop: 1 }]} numberOfLines={1}>
+                {t.aiCoachSubtitle}
+              </Text>
+            </View>
           </View>
-          <Text style={[styles.screenSubtitle, { color: theme.textSecondary }]}>{t.aiCoachSubtitle}</Text>
+          {isPro ? (
+            <View style={[styles.proActiveBadge, { backgroundColor: theme.powder, borderColor: theme.headerBlock }]}>
+              <Ionicons name="shield-checkmark" size={12} color={theme.primary} />
+              <Text style={[styles.proActiveBadgeText, { color: theme.primary }]}>PRO</Text>
+            </View>
+          ) : (
+            <View style={[styles.proLockBadge, { backgroundColor: isDark ? '#263B4D' : '#FFF7ED', borderColor: theme.borderMedium }]}>
+              <Ionicons name="lock-closed" size={11} color={theme.primary} />
+              <Text style={[styles.proLockBadgeText, { color: theme.primary }]}>PRO</Text>
+            </View>
+          )}
         </View>
 
         {/* FREE TIER LOCKED VIEW */}
@@ -314,49 +332,6 @@ export const AiCoachScreen: React.FC<AiCoachScreenProps> = ({
                   {t.proUpgradeBtn}
                 </Text>
               </TouchableOpacity>
-            </View>
-
-            {/* Teaser Preview Card */}
-            <View
-              style={[
-                styles.teaserCard,
-                {
-                  backgroundColor: theme.surface,
-                  borderColor: theme.border,
-                  shadowColor: theme.shadowColor,
-                },
-              ]}
-            >
-              <View style={styles.teaserTop}>
-                <Ionicons name="eye-outline" size={16} color={theme.primary} />
-                <Text style={[styles.teaserLabel, { color: theme.primary }]}>
-                  {language === 'bn' ? 'স্মার্ট ফিচারের পূর্বরূপ' : 'SMART COACH PREVIEW'}
-                </Text>
-              </View>
-
-              <View style={[styles.teaserItem, { backgroundColor: isDark ? '#16191D' : '#F6F9FC', borderColor: theme.border }]}>
-                <View style={styles.teaserItemHeader}>
-                  <Ionicons name="bulb-outline" size={16} color={theme.primary} />
-                  <Text style={[styles.teaserTitle, { color: theme.textPrimary }]}>{t.dailyAdviceTitle}</Text>
-                </View>
-                <Text style={[styles.teaserBody, { color: theme.textSecondary }]}>
-                  {language === 'bn'
-                    ? 'আপনার মেস ভাড়ার টাকা আলাদা রাখুন। ক্যান্টিনে প্রতিবেলা ৪০ টাকার মধ্যে খাবার খেলে মাস শেষে প্রায় ৯০০ টাকা সঞ্চয় হবে।'
-                    : 'Protect rent & mess first. Keep campus lunches under Tk 40 to ensure positive month-end savings.'}
-                </Text>
-              </View>
-
-              <View style={[styles.teaserItem, { backgroundColor: isDark ? '#16191D' : '#F6F9FC', borderColor: theme.border }]}>
-                <View style={styles.teaserItemHeader}>
-                  <Ionicons name="calculator-outline" size={16} color={theme.headerBlock} />
-                  <Text style={[styles.teaserTitle, { color: theme.textPrimary }]}>{t.simulatorTitle}</Text>
-                </View>
-                <Text style={[styles.teaserBody, { color: theme.textSecondary }]}>
-                  {language === 'bn'
-                    ? 'কেনাকাটা করার আগেই জেনে নিন তা আপনার ঝুঁকি স্কোর, সঞ্চয় লক্ষ্য এবং দৈনিক নিরাপদ বরাদ্দে কী প্রভাব ফেলবে।'
-                    : 'Simulate purchase impact on risk scores, target savings, and safe daily allowances before spending.'}
-                </Text>
-              </View>
             </View>
           </View>
         ) : (
