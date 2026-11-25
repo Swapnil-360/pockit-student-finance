@@ -489,9 +489,10 @@ class Database:
         if self.supabase:
             sb_u = self._get_supabase_auth_user(email_clean)
             if sb_u:
-                full_name = sb_u.user_metadata.get('full_name') or sb_u.user_metadata.get('name') or email_clean.split('@')[0]
+                extra_s = self._get_user_settings_from_supabase(sb_u.id)
+                full_name = extra_s.get('full_name') or sb_u.user_metadata.get('full_name') or sb_u.user_metadata.get('name') or email_clean.split('@')[0]
                 avatar = sb_u.user_metadata.get('avatar_url') or sb_u.user_metadata.get('picture')
-                calling_name = sb_u.user_metadata.get('calling_name')
+                calling_name = extra_s.get('calling_name') or sb_u.user_metadata.get('calling_name')
                 if not calling_name and 'Swapnil' in full_name:
                     calling_name = 'Swapnil'
                 fake_hash = self._hash_password(str(uuid.uuid4()))
@@ -579,12 +580,10 @@ class Database:
                 })
                 if auth_res and getattr(auth_res, 'user', None):
                     u = auth_res.user
-                    full_name = u.user_metadata.get('full_name') or email.split('@')[0]
+                    extra_s = self._get_user_settings_from_supabase(u.id)
+                    full_name = extra_s.get('full_name') or u.user_metadata.get('full_name') or email.split('@')[0]
                     avatar = u.user_metadata.get('avatar_url')
-                    calling_name = u.user_metadata.get('calling_name')
-                    if not calling_name:
-                        extra_s = self._get_user_settings_from_supabase(user_id)
-                        calling_name = extra_s.get('calling_name')
+                    calling_name = extra_s.get('calling_name') or u.user_metadata.get('calling_name')
                     if not calling_name and 'Swapnil' in full_name:
                         calling_name = 'Swapnil'
                     with self._get_connection() as conn:
@@ -628,12 +627,10 @@ class Database:
                 sb_res = self.supabase.auth.admin.get_user_by_id(sb_uid)
                 if sb_res and getattr(sb_res, 'user', None):
                     u = sb_res.user
-                    full_name = u.user_metadata.get('full_name') or (u.email.split('@')[0] if u.email else 'User')
+                    extra_s = self._get_user_settings_from_supabase(sb_uid)
+                    full_name = extra_s.get('full_name') or u.user_metadata.get('full_name') or (u.email.split('@')[0] if u.email else 'User')
                     avatar = u.user_metadata.get('avatar_url') or u.user_metadata.get('picture')
-                    calling_name = u.user_metadata.get('calling_name')
-                    if not calling_name:
-                        extra_s = self._get_user_settings_from_supabase(user_id)
-                        calling_name = extra_s.get('calling_name')
+                    calling_name = extra_s.get('calling_name') or u.user_metadata.get('calling_name')
                     if not calling_name and 'Swapnil' in full_name:
                         calling_name = 'Swapnil'
                     fake_hash = self._hash_password(str(uuid.uuid4()))
@@ -724,16 +721,19 @@ class Database:
                 conn.commit()
             else:
                 fake_hash = self._hash_password(str(uuid.uuid4()))
-                calling_val = 'Swapnil' if 'Swapnil' in full_name else None
+                extra_s = self._get_user_settings_from_supabase(user_id) if self.supabase else {}
+                saved_calling = extra_s.get('calling_name')
+                saved_full = extra_s.get('full_name') or full_name.strip()
+                calling_val = saved_calling or ('Swapnil' if 'Swapnil' in saved_full else None)
                 cursor.execute("""
                     INSERT INTO users (id, email, password_hash, full_name, calling_name, avatar_url, is_demo, is_pro)
                     VALUES (?, ?, ?, ?, ?, ?, 0, 0)
-                """, (user_id, email_clean, fake_hash, full_name.strip(), calling_val, avatar_url))
+                """, (user_id, email_clean, fake_hash, saved_full, calling_val, avatar_url))
                 conn.commit()
                 user_dict = {
                     "id": user_id,
                     "email": email_clean,
-                    "full_name": full_name.strip(),
+                    "full_name": saved_full,
                     "calling_name": calling_val,
                     "avatar_url": avatar_url,
                     "is_demo": 0,
@@ -902,9 +902,27 @@ class Database:
                 if enable_mess_meals is not None:
                     extra_settings['enable_mess_meals'] = bool(enable_mess_meals)
                 if calling_name is not None:
-                    extra_settings['calling_name'] = calling_name
+                    extra_settings['calling_name'] = calling_name.strip()
+                if full_name is not None:
+                    extra_settings['full_name'] = full_name.strip()
                 if extra_settings:
                     self._save_user_settings_to_supabase(user_id, extra_settings)
+
+                auth_meta_updates: Dict[str, Any] = {}
+                if full_name is not None:
+                    auth_meta_updates['full_name'] = full_name.strip()
+                if calling_name is not None:
+                    auth_meta_updates['calling_name'] = calling_name.strip()
+                if avatar_url is not None:
+                    auth_meta_updates['avatar_url'] = avatar_url
+                if auth_meta_updates:
+                    try:
+                        self.supabase.auth.admin.update_user_by_id(
+                            self._to_uuid(user_id),
+                            {"user_metadata": auth_meta_updates},
+                        )
+                    except Exception as e_meta:
+                        print(f"[Supabase sync notice] update_user_profile auth meta: {e_meta}")
             except Exception as e:
                 print(f"[Supabase sync notice] update_user_profile: {e}")
 
@@ -1178,7 +1196,14 @@ class Database:
                     'mess_meal_fixed': float(profile_data.get('mess_meal_fixed', 0)),
                     'academic_fee_fixed': float(profile_data.get('academic_fee_fixed', 0)),
                     'transport_fixed': float(profile_data.get('transport_fixed', 0)),
-                    'enable_mess_meals': bool(profile_data.get('enable_mess_meals', profile_data.get('where_you_live') == 'Mess-hostel')),
+                    'enable_mess_meals': bool(
+                        profile_data['enable_mess_meals']
+                        if profile_data.get('enable_mess_meals') is not None
+                        else (
+                            'mess' in str(profile_data.get('where_you_live') or '').lower()
+                            or float(profile_data.get('mess_meal_fixed') or 0) > 0
+                        )
+                    ),
                 })
             except Exception as e:
                 print(f"[Supabase sync notice] save_profile: {e}")
@@ -1191,7 +1216,14 @@ class Database:
             aware_score = float(p.get('awareness_score') or 3.0)
             impulse_score = float(p.get('impulse_score') or 3.0)
             where_live = p.get('where_you_live', 'Mess-hostel')
-            enable_mess = 1 if p.get('enable_mess_meals', where_live == 'Mess-hostel') else 0
+            enable_mess = 1 if (
+                p['enable_mess_meals']
+                if p.get('enable_mess_meals') is not None
+                else (
+                    'mess' in str(where_live or '').lower()
+                    or float(p.get('mess_meal_fixed') or 0) > 0
+                )
+            ) else 0
 
             with self._get_connection() as conn:
                 cursor = conn.cursor()
@@ -1258,7 +1290,10 @@ class Database:
             if row:
                 res = dict(row)
                 if res.get("enable_mess_meals") is None:
-                    res["enable_mess_meals"] = (res.get("where_you_live") == "Mess-hostel")
+                    res["enable_mess_meals"] = (
+                        "mess" in str(res.get("where_you_live") or "").lower()
+                        or float(res.get("mess_meal_fixed") or 0) > 0
+                    )
                 else:
                     res["enable_mess_meals"] = bool(res["enable_mess_meals"])
                 return res
@@ -1277,7 +1312,10 @@ class Database:
                                 sb_prof[k] = extra_settings[k]
                     self._restore_profile_to_sqlite(user_id, sb_prof)
                     if sb_prof.get("enable_mess_meals") is None:
-                        sb_prof["enable_mess_meals"] = (sb_prof.get("where_you_live") == "Mess-hostel")
+                        sb_prof["enable_mess_meals"] = (
+                            "mess" in str(sb_prof.get("where_you_live") or "").lower()
+                            or float(sb_prof.get("mess_meal_fixed") or 0) > 0
+                        )
                     else:
                         sb_prof["enable_mess_meals"] = bool(sb_prof["enable_mess_meals"])
                     return sb_prof

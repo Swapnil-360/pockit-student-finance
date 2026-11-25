@@ -472,7 +472,9 @@ function AppContent() {
               refreshData();
             }}
             onProfileUpdated={(updated: Partial<UserData>) => {
-              setUser({ ...user, ...updated });
+              const merged = { ...user, ...updated };
+              setUser(merged);
+              AsyncStorage.setItem('@pockit_user', JSON.stringify(merged)).catch(() => {});
               refreshData();
             }}
           />
