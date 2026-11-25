@@ -70,6 +70,46 @@ class Database:
         except ValueError:
             return str(uuid.uuid5(uuid.NAMESPACE_DNS, uid))
 
+    def _get_user_settings_from_supabase(self, user_id: str) -> Dict[str, Any]:
+        """Reads extended profile settings (mess_meal_fixed, academic_fee_fixed, etc.) from Supabase monthly_archives."""
+        if not self.supabase:
+            return {}
+        try:
+            sb_uid = self._to_uuid(user_id)
+            settings_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"settings_{sb_uid}"))
+            res = self.supabase.table('monthly_archives').select('summary_json').eq('id', settings_id).execute()
+            if res.data and len(res.data) > 0:
+                raw = res.data[0].get('summary_json')
+                if isinstance(raw, dict):
+                    return raw
+                if isinstance(raw, str):
+                    return json.loads(raw)
+        except Exception as e:
+            print(f"[Supabase sync notice] _get_user_settings: {e}")
+        return {}
+
+    def _save_user_settings_to_supabase(self, user_id: str, extra: Dict[str, Any]):
+        """Persists extended profile settings into Supabase monthly_archives so they survive server restarts."""
+        if not self.supabase or not extra:
+            return
+        try:
+            sb_uid = self._to_uuid(user_id)
+            settings_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"settings_{sb_uid}"))
+            current = self._get_user_settings_from_supabase(user_id)
+            current.update({k: v for k, v in extra.items() if v is not None})
+            self.supabase.table('monthly_archives').upsert({
+                'id': settings_id,
+                'user_id': sb_uid,
+                'month': '__user_settings__',
+                'total_income': 0,
+                'total_spent': 0,
+                'ending_balance': 0,
+                'final_risk_score': 0,
+                'summary_json': json.dumps(current),
+            }).execute()
+        except Exception as e:
+            print(f"[Supabase sync notice] _save_user_settings: {e}")
+
     def _get_connection(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
@@ -541,6 +581,9 @@ class Database:
                     full_name = u.user_metadata.get('full_name') or email.split('@')[0]
                     avatar = u.user_metadata.get('avatar_url')
                     calling_name = u.user_metadata.get('calling_name')
+                    if not calling_name:
+                        extra_s = self._get_user_settings_from_supabase(user_id)
+                        calling_name = extra_s.get('calling_name')
                     if not calling_name and 'Swapnil' in full_name:
                         calling_name = 'Swapnil'
                     with self._get_connection() as conn:
@@ -587,6 +630,9 @@ class Database:
                     full_name = u.user_metadata.get('full_name') or (u.email.split('@')[0] if u.email else 'User')
                     avatar = u.user_metadata.get('avatar_url') or u.user_metadata.get('picture')
                     calling_name = u.user_metadata.get('calling_name')
+                    if not calling_name:
+                        extra_s = self._get_user_settings_from_supabase(user_id)
+                        calling_name = extra_s.get('calling_name')
                     if not calling_name and 'Swapnil' in full_name:
                         calling_name = 'Swapnil'
                     fake_hash = self._hash_password(str(uuid.uuid4()))
@@ -841,7 +887,23 @@ class Database:
                     sb_updates['savings_goal_fixed'] = savings_goal_fixed
 
                 if sb_updates:
-                    self.supabase.table('profiles').update(sb_updates).eq('user_id', self._to_uuid(user_id)).execute()
+                    filtered_sb_updates = {k: v for k, v in sb_updates.items() if k in SUPABASE_PROFILE_COLUMNS}
+                    if filtered_sb_updates:
+                        self.supabase.table('profiles').update(filtered_sb_updates).eq('user_id', self._to_uuid(user_id)).execute()
+
+                extra_settings = {}
+                if mess_meal_fixed is not None:
+                    extra_settings['mess_meal_fixed'] = float(mess_meal_fixed)
+                if academic_fee_fixed is not None:
+                    extra_settings['academic_fee_fixed'] = float(academic_fee_fixed)
+                if transport_fixed is not None:
+                    extra_settings['transport_fixed'] = float(transport_fixed)
+                if enable_mess_meals is not None:
+                    extra_settings['enable_mess_meals'] = bool(enable_mess_meals)
+                if calling_name is not None:
+                    extra_settings['calling_name'] = calling_name
+                if extra_settings:
+                    self._save_user_settings_to_supabase(user_id, extra_settings)
             except Exception as e:
                 print(f"[Supabase sync notice] update_user_profile: {e}")
 
@@ -1111,6 +1173,12 @@ class Database:
                 # Filter to only columns present in Supabase table to prevent schema cache errors
                 sb_data = {k: v for k, v in full_sb_data.items() if k in SUPABASE_PROFILE_COLUMNS}
                 self.supabase.table('profiles').upsert(sb_data).execute()
+                self._save_user_settings_to_supabase(user_id, {
+                    'mess_meal_fixed': float(profile_data.get('mess_meal_fixed', 0)),
+                    'academic_fee_fixed': float(profile_data.get('academic_fee_fixed', 0)),
+                    'transport_fixed': float(profile_data.get('transport_fixed', 0)),
+                    'enable_mess_meals': bool(profile_data.get('enable_mess_meals', profile_data.get('where_you_live') == 'Mess-hostel')),
+                })
             except Exception as e:
                 print(f"[Supabase sync notice] save_profile: {e}")
 
@@ -1122,7 +1190,7 @@ class Database:
             aware_score = float(p.get('awareness_score') or 3.0)
             impulse_score = float(p.get('impulse_score') or 3.0)
             where_live = p.get('where_you_live', 'Mess-hostel')
-            enable_mess = 1 if where_live == 'Mess-hostel' else 0
+            enable_mess = 1 if p.get('enable_mess_meals', where_live == 'Mess-hostel') else 0
 
             with self._get_connection() as conn:
                 cursor = conn.cursor()
@@ -1201,8 +1269,16 @@ class Database:
                 res = self.supabase.table('profiles').select('*').eq('user_id', sb_uid).execute()
                 if res.data and len(res.data) > 0:
                     sb_prof = res.data[0]
+                    extra_settings = self._get_user_settings_from_supabase(user_id)
+                    if extra_settings:
+                        for k in ('mess_meal_fixed', 'academic_fee_fixed', 'transport_fixed', 'enable_mess_meals'):
+                            if k in extra_settings and extra_settings[k] is not None:
+                                sb_prof[k] = extra_settings[k]
                     self._restore_profile_to_sqlite(user_id, sb_prof)
-                    sb_prof["enable_mess_meals"] = (sb_prof.get("where_you_live") == "Mess-hostel")
+                    if sb_prof.get("enable_mess_meals") is None:
+                        sb_prof["enable_mess_meals"] = (sb_prof.get("where_you_live") == "Mess-hostel")
+                    else:
+                        sb_prof["enable_mess_meals"] = bool(sb_prof["enable_mess_meals"])
                     return sb_prof
             except Exception as e:
                 print(f"[Supabase sync notice] get_profile fallback: {e}")
@@ -2589,7 +2665,9 @@ class Database:
             cursor = conn.cursor()
             cursor.execute("UPDATE profiles SET mess_meal_fixed = ? WHERE user_id = ?", (float(meal_advance_paid), user_id))
             conn.commit()
-            return cursor.rowcount > 0
+            updated = cursor.rowcount > 0
+        self._save_user_settings_to_supabase(user_id, {'mess_meal_fixed': float(meal_advance_paid)})
+        return updated
 
 
 

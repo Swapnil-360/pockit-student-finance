@@ -413,15 +413,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </View>
         </View>
 
-        {/* 4. 3-Stat Cards Row (Rent & Mess, Savings, Left for Month - Matching Image 1) */}
+        {/* 4. 3-Stat Cards Row (Compact Image 5 Style: Rent & Mess, Savings, Left for Month) */}
         <View style={styles.threeStatRow}>
           {/* Card 1: Rent & Mess */}
           <TouchableOpacity
             style={[
               styles.statCardItem,
               {
-                backgroundColor: isDark ? '#1A1D21' : '#FFFFFF',
-                borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(83, 122, 150, 0.12)',
+                backgroundColor: isDark ? '#1A1D21' : '#F2F6FA',
+                borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(83, 122, 150, 0.10)',
                 shadowColor: isDark ? '#000000' : '#466B85',
               },
             ]}
@@ -431,24 +431,22 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             }}
             activeOpacity={0.8}
           >
-            <View style={[styles.statIconCircle, { backgroundColor: isDark ? 'rgba(2, 132, 199, 0.18)' : '#E0F2FE' }]}>
-              <Ionicons name="home" size={18} color="#0284C7" />
-            </View>
-            <Text style={[styles.statCardLabel, { color: theme.textSecondary }]} numberOfLines={1}>
+            <Ionicons name="home" size={20} color="#6E92A8" style={styles.statIcon} />
+            <Text style={[styles.statCardLabel, { color: isDark ? '#A0AEC0' : '#475569' }]} numberOfLines={1}>
               {dashboard.enable_mess_meals !== false ? 'Rent & Mess' : 'Housing'}
             </Text>
-            <Text style={[styles.statCardVal, { color: isDark ? '#F8FAFC' : '#0F172A' }]} numberOfLines={1}>
-              ৳{Math.round(dashboard.fixed_obligations_spent !== undefined ? dashboard.fixed_obligations_spent : (dashboard.category_breakdown?.['Rent'] || 7000)).toLocaleString()}
+            <Text style={[styles.statCardVal, { color: isDark ? '#F8FAFC' : '#1E293B' }]} numberOfLines={1}>
+              ৳{Math.round(dashboard.fixed_obligations_spent ?? (dashboard.category_breakdown?.['Rent'] ?? 0)).toLocaleString()}
             </Text>
           </TouchableOpacity>
 
-          {/* Card 2: Savings (Piggy bank icon in soft green circle) */}
+          {/* Card 2: Savings */}
           <TouchableOpacity
             style={[
               styles.statCardItem,
               {
-                backgroundColor: isDark ? '#1A1D21' : '#FFFFFF',
-                borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(83, 122, 150, 0.12)',
+                backgroundColor: isDark ? '#1A1D21' : '#F2F6FA',
+                borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(83, 122, 150, 0.10)',
                 shadowColor: isDark ? '#000000' : '#466B85',
               },
             ]}
@@ -458,33 +456,29 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             }}
             activeOpacity={0.8}
           >
-            <View style={[styles.statIconCircle, { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.18)' : '#DCFCE7' }]}>
-              <MaterialCommunityIcons name="piggy-bank" size={20} color="#16A34A" />
-            </View>
-            <Text style={[styles.statCardLabel, { color: theme.textSecondary }]} numberOfLines={1}>
+            <MaterialCommunityIcons name="piggy-bank" size={22} color="#10B981" style={styles.statIcon} />
+            <Text style={[styles.statCardLabel, { color: isDark ? '#A0AEC0' : '#475569' }]} numberOfLines={1}>
               {language === 'bn' ? 'সঞ্চয়' : 'Savings'}
             </Text>
-            <Text style={[styles.statCardVal, { color: isDark ? '#F8FAFC' : '#0F172A' }]} numberOfLines={1}>
-              ৳{Math.round(dashboard.target_savings || 500).toLocaleString()}
+            <Text style={[styles.statCardVal, { color: isDark ? '#F8FAFC' : '#1E293B' }]} numberOfLines={1}>
+              ৳{Math.round(dashboard.target_savings ?? 0).toLocaleString()}
             </Text>
           </TouchableOpacity>
 
-          {/* Card 3: Left for Month (Wallet icon in soft orange circle, no truncation) */}
+          {/* Card 3: Left for Month */}
           <View
             style={[
               styles.statCardItem,
               {
-                backgroundColor: isDark ? '#1A1D21' : '#FFFFFF',
-                borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(83, 122, 150, 0.12)',
-                shadowColor: isDark ? '#000000' : '#466B85',
+                backgroundColor: isDark ? '#201B18' : '#FFF7F2',
+                borderColor: isDark ? 'rgba(244, 123, 78, 0.2)' : 'rgba(244, 123, 78, 0.16)',
+                shadowColor: isDark ? '#000000' : '#F47B4E',
               },
             ]}
           >
-            <View style={[styles.statIconCircle, { backgroundColor: isDark ? 'rgba(234, 88, 12, 0.18)' : '#FFEDD5' }]}>
-              <Ionicons name="wallet" size={18} color="#EA580C" />
-            </View>
+            <Ionicons name="wallet" size={20} color="#F47B4E" style={styles.statIcon} />
             <Text
-              style={[styles.statCardLabel, { color: theme.textSecondary }]}
+              style={[styles.statCardLabel, { color: isDark ? '#A0AEC0' : '#475569' }]}
               numberOfLines={1}
               adjustsFontSizeToFit
               minimumFontScale={0.85}
@@ -497,7 +491,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 {
                   color: (dashboard.spendable_variable_pool !== undefined ? dashboard.spendable_variable_pool : dashboard.remaining_balance) <= 0
                     ? '#EF4444'
-                    : (isDark ? '#F8FAFC' : '#0F172A'),
+                    : (isDark ? '#F8FAFC' : '#1E293B'),
                 },
               ]}
               numberOfLines={1}
@@ -931,24 +925,19 @@ const styles = StyleSheet.create({
   },
   statCardItem: {
     flex: 1,
-    borderRadius: 16,
+    borderRadius: 14,
     borderWidth: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 4,
+    paddingVertical: 10,
+    paddingHorizontal: 6,
     alignItems: 'center',
     justifyContent: 'center',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 1,
   },
-  statIconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 6,
+  statIcon: {
+    marginBottom: 4,
   },
   statCardLabel: {
     fontSize: 11,
@@ -957,8 +946,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   statCardVal: {
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: 15.5,
+    fontWeight: '800',
     textAlign: 'center',
   },
   dreamGoalCard: {

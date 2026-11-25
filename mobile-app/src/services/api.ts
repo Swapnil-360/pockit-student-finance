@@ -865,13 +865,17 @@ export async function updateBudgetBaseline(
   if (baseline.enableMessMeals !== undefined) payload.enable_mess_meals = baseline.enableMessMeals;
 
   try {
-    const res = await fetch(`${API_BASE_URL}/api/user/${userId}/budget-baseline`, {
+    const res = await fetchWithTimeout(`${API_BASE_URL}/api/user/${userId}/budget-baseline`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
-    });
+    }, 25000);
     if (res.ok) {
-      return await res.json();
+      const updated = await res.json();
+      if (updated) {
+        await AsyncStorage.setItem(`@student_profile_${userId}`, JSON.stringify(updated));
+      }
+      return updated;
     }
   } catch (e) {
     console.warn("API offline fallback for budget baseline update:", e);
@@ -1027,7 +1031,7 @@ export async function getStudentProfile(userId: string): Promise<any> {
     return data ? JSON.parse(data) : null;
   }
   try {
-    const res = await fetchWithTimeout(`${API_BASE_URL}/api/profile/${userId}`, {}, 8000);
+    const res = await fetchWithTimeout(`${API_BASE_URL}/api/profile/${userId}`, {}, 25000);
     if (res.ok) {
       const data = await res.json();
       if (data) {
@@ -1075,7 +1079,7 @@ export async function fetchDashboard(userId: string): Promise<DashboardData> {
     return await calculateGuestDashboard();
   }
   try {
-    const res = await fetchWithTimeout(`${API_BASE_URL}/api/dashboard/${userId}`, {}, 8000);
+    const res = await fetchWithTimeout(`${API_BASE_URL}/api/dashboard/${userId}`, {}, 25000);
     if (res.ok) {
       const data: DashboardData = await res.json();
       await AsyncStorage.setItem(STORAGE_KEYS.DASHBOARD_CACHE, JSON.stringify(data));
@@ -1594,14 +1598,21 @@ export async function fetchSavingsGoals(userId: string): Promise<SavingsGoal[]> 
     const goalsJson = await AsyncStorage.getItem(GUEST_STORAGE_KEYS.GOALS);
     return goalsJson ? JSON.parse(goalsJson) : [];
   }
+  const cacheKey = `@pockit_goals_${userId}`;
   try {
-    const res = await fetch(`${API_BASE_URL}/api/goals/${userId}`);
+    const res = await fetchWithTimeout(`${API_BASE_URL}/api/goals/${userId}`, {}, 25000);
     if (res.ok) {
-      return await res.json();
+      const data: SavingsGoal[] = await res.json();
+      await AsyncStorage.setItem(cacheKey, JSON.stringify(data));
+      return data;
     }
   } catch (e) {
     console.warn("API offline fallback for goals:", e);
   }
+  try {
+    const cached = await AsyncStorage.getItem(cacheKey);
+    if (cached) return JSON.parse(cached);
+  } catch {}
   return [];
 }
 
@@ -1655,16 +1666,24 @@ export async function createSavingsGoal(payload: {
     await calculateGuestDashboard();
     return newGoal;
   }
-  const res = await fetch(`${API_BASE_URL}/api/goals`, {
+  const res = await fetchWithTimeout(`${API_BASE_URL}/api/goals`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
-  });
+  }, 25000);
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: 'Failed to create goal' }));
     throw new Error(err.detail || 'Failed to create goal');
   }
-  return await res.json();
+  const created: SavingsGoal = await res.json();
+  try {
+    const cacheKey = `@pockit_goals_${payload.user_id}`;
+    const existing = await AsyncStorage.getItem(cacheKey);
+    const list: SavingsGoal[] = existing ? JSON.parse(existing) : [];
+    list.unshift(created);
+    await AsyncStorage.setItem(cacheKey, JSON.stringify(list));
+  } catch {}
+  return created;
 }
 
 export async function boostSavingsGoal(goalId: string, userId: string, amount: number): Promise<SavingsGoal> {
