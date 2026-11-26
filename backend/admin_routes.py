@@ -17,6 +17,7 @@ import hmac
 import io
 import json
 import os
+import secrets
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -31,8 +32,9 @@ from database import db
 router = APIRouter(prefix="/api/admin", tags=["Admin Panel"])
 
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@pockit.app").strip().lower()
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "pockit-admin-2026").strip()
-ADMIN_SECRET = (os.getenv("ADMIN_SECRET", "") or SUPABASE_SERVICE_ROLE_KEY or "pockit-hmac-fallback-secret").encode("utf-8")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "").strip()
+_EPHEMERAL_FALLBACK_SECRET = os.urandom(32).hex()
+ADMIN_SECRET = (os.getenv("ADMIN_SECRET", "") or SUPABASE_SERVICE_ROLE_KEY or _EPHEMERAL_FALLBACK_SECRET).encode("utf-8")
 TOKEN_TTL_SECONDS = 86400  # 24 hours
 
 
@@ -118,6 +120,10 @@ class AdminAnnouncementRequest(BaseModel):
 # --- Auth ---
 @router.post("/login")
 def admin_login(req: AdminLoginRequest):
+    if not ADMIN_PASSWORD:
+        raise HTTPException(status_code=503, detail="Admin password is not configured on the server")
+    if not ADMIN_PASSWORD:
+        raise HTTPException(status_code=503, detail="Admin password is not configured on the server")
     if req.email.strip().lower() != ADMIN_EMAIL or not hmac.compare_digest(req.password.strip(), ADMIN_PASSWORD):
         raise HTTPException(status_code=401, detail="Invalid admin email or password")
     token = _sign_token(ADMIN_EMAIL)

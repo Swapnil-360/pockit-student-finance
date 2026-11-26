@@ -2,22 +2,29 @@
 Integration tests for Pockit Admin Panel API, Auth Guard, Streak Offers, and CSV Exports.
 """
 from fastapi.testclient import TestClient
+
+import admin_routes
 from main import app
 
 client = TestClient(app)
 
 
 def test_admin_suite():
+    if not admin_routes.ADMIN_PASSWORD:
+        admin_routes.ADMIN_PASSWORD = "test-admin-password"
+    test_email = admin_routes.ADMIN_EMAIL
+    test_password = admin_routes.ADMIN_PASSWORD
+
     # 1. Unauthorized access blocked
     res_unauth = client.get("/api/admin/overview")
     assert res_unauth.status_code == 401, f"Expected 401, got {res_unauth.status_code}"
 
     # 2. Invalid login rejected
-    res_bad = client.post("/api/admin/login", json={"email": "admin@pockit.app", "password": "wrong"})
+    res_bad = client.post("/api/admin/login", json={"email": test_email, "password": "wrong"})
     assert res_bad.status_code == 401
 
     # 3. Valid login succeeds
-    res_ok = client.post("/api/admin/login", json={"email": "admin@pockit.app", "password": "pockit-admin-2026"})
+    res_ok = client.post("/api/admin/login", json={"email": test_email, "password": test_password})
     assert res_ok.status_code == 200, res_ok.text
     token = res_ok.json()["token"]
     headers = {"Authorization": f"Bearer {token}"}
@@ -55,4 +62,3 @@ def test_admin_suite():
 
 if __name__ == "__main__":
     test_admin_suite()
-
