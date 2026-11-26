@@ -20,6 +20,7 @@ import uuid
 from typing import Any, Dict, List, Optional
 import pandas as pd
 from fastapi import FastAPI, HTTPException, Query, Response
+from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
@@ -1416,6 +1417,66 @@ def submit_feedback(feedback: FeedbackRequest):
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Feedback recording error: {str(e)}")
+
+
+_PRIVACY_HTML = """<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pockit — Privacy Policy</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #F8FAFC; color: #0F172A; margin: 0; padding: 32px 16px; line-height: 1.65; }
+    .card { max-width: 760px; margin: 0 auto; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 16px; padding: 32px; box-shadow: 0 4px 20px rgba(15, 23, 42, 0.05); }
+    h1 { margin-top: 0; font-size: 26px; color: #0F172A; }
+    h2 { font-size: 17px; margin-top: 24px; color: #1E293B; }
+    .badge { display: inline-block; background: #FFF7ED; color: #EA580C; font-weight: 700; font-size: 12px; padding: 4px 10px; border-radius: 999px; margin-bottom: 10px; }
+    p, li { color: #334155; font-size: 14.5px; }
+    .muted { color: #64748B; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <span class="badge">Pockit — Student Financial Intelligence</span>
+    <h1>Privacy Policy</h1>
+    <p class="muted">Effective Date: November 26, 2026</p>
+    <p>Pockit ("we", "our", or "the App") respects your privacy and is committed to protecting your personal and financial data. This Privacy Policy explains what information we collect, how we use it, and your rights regarding your data.</p>
+
+    <h2>1. Information We Collect</h2>
+    <ul>
+      <li><strong>Account Information:</strong> Name, email address, and optional profile photo when you register with email/password or sign in with Google.</li>
+      <li><strong>Financial &amp; Budget Inputs:</strong> Monthly allowance, fixed rent, mess meal advances, daily meal counts, expenses, incomes, savings goals, and financial habit survey responses that you enter.</li>
+      <li><strong>App Usage &amp; Feedback:</strong> Daily streak check-ins, optional in-app feedback, bug reports, and month-end check-ins used to improve our financial risk forecasting model.</li>
+    </ul>
+
+    <h2>2. How We Use Your Information</h2>
+    <ul>
+      <li>To calculate your Safe Daily Spending Limit, Mess Meal Refund balance, Dream Goal progress, and financial risk score.</li>
+      <li>To sync your data securely across devices and provide Smart Coach insights.</li>
+      <li>We <strong>never sell</strong> your personal data or share it with third-party advertisers.</li>
+    </ul>
+
+    <h2>3. Data Storage &amp; Security</h2>
+    <p>All data is transmitted over encrypted HTTPS/TLS connections and stored securely using Supabase Cloud authentication and PostgreSQL databases. Optional 4-digit PIN lock hashes are stored securely and never exposed in plain text.</p>
+
+    <h2>4. Account &amp; Data Deletion</h2>
+    <p>You can permanently delete your account and all associated financial records at any time directly inside the app via <strong>Profile &rarr; Delete Account Permanently</strong>. You may also request deletion by emailing <a href="mailto:admin@pockit.app">admin@pockit.app</a>.</p>
+
+    <h2>5. Contact Us</h2>
+    <p>If you have questions about this Privacy Policy, contact us at <a href="mailto:admin@pockit.app">admin@pockit.app</a>.</p>
+  </div>
+</body>
+</html>"""
+
+
+@app.get("/privacy", response_class=HTMLResponse)
+def privacy_policy_page():
+    return HTMLResponse(content=_PRIVACY_HTML)
+
+
+@app.get("/delete-account", response_class=HTMLResponse)
+def delete_account_info_page():
+    return HTMLResponse(content=_PRIVACY_HTML)
 
 
 _admin_dist = Path(__file__).resolve().parent.parent / "admin-panel" / "dist"
