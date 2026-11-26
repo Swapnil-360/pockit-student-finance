@@ -51,7 +51,7 @@ export const BRANDING = {
     universityTarget: 'University Students of Bangladesh',
     currencySymbol: '৳',
     currencyCode: 'BDT',
-    supportEmail: 'support@pockit.app',
+    supportEmail: 'miftahurr503@gmail.com',
     customLogoInstructions:
       'Drop your PNG/SVG into mobile-app/assets/brand/ (logo.png, splash-icon.png, adaptive-icon.png). Components consume this config automatically.',
   },

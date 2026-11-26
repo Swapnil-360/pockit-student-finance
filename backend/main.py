@@ -1460,10 +1460,10 @@ _PRIVACY_HTML = """<!DOCTYPE html>
     <p>All data is transmitted over encrypted HTTPS/TLS connections and stored securely using Supabase Cloud authentication and PostgreSQL databases. Optional 4-digit PIN lock hashes are stored securely and never exposed in plain text.</p>
 
     <h2>4. Account &amp; Data Deletion</h2>
-    <p>You can permanently delete your account and all associated financial records at any time directly inside the app via <strong>Profile &rarr; Delete Account Permanently</strong>. You may also request deletion by emailing <a href="mailto:admin@pockit.app">admin@pockit.app</a>.</p>
+    <p>You can permanently delete your account and all associated financial records at any time directly inside the app via <strong>Profile &rarr; Delete Account Permanently</strong>. You may also request deletion by emailing <a href="mailto:miftahurr503@gmail.com">miftahurr503@gmail.com</a>.</p>
 
     <h2>5. Contact Us</h2>
-    <p>If you have questions about this Privacy Policy, contact us at <a href="mailto:admin@pockit.app">admin@pockit.app</a>.</p>
+    <p>If you have questions about this Privacy Policy, contact us at <a href="mailto:miftahurr503@gmail.com">miftahurr503@gmail.com</a>.</p>
   </div>
 </body>
 </html>"""
