@@ -1,7 +1,24 @@
-# TakaTrack AI — Student Money & Risk Coach
+# Pockit — Student Money & Financial Risk Coach
 ### মাসের শেষে পকেট খালি হওয়ার আগেই সতর্ক হোন! | Get warned before your pocket runs empty!
 
+[![Latest Release](https://img.shields.io/github/v/release/Swapnil-360/pockit-student-finance?label=Download%20APK&color=10B981&style=for-the-badge)](https://github.com/Swapnil-360/pockit-student-finance/releases/latest)
+[![Platform](https://img.shields.io/badge/Platform-Android%20%7C%20Web-0EA5E9?style=for-the-badge)](https://github.com/Swapnil-360/pockit-student-finance/releases/latest)
+[![Backend](https://img.shields.io/badge/Backend-FastAPI%20%2B%20Gemini%20AI-F59E0B?style=for-the-badge)](https://pockit-backend-eppq.onrender.com/docs)
+
 A complete, production-grade cross-platform mobile application and intelligent backend ecosystem engineered specifically for university students in Bangladesh. Powered by a pre-trained hybrid Machine Learning risk model (`financial_risk_model.pkl`) and **Google Gemini 2.5 Flash (`gemini-2.5-flash`)**.
+
+---
+
+## 📱 Download & Install (Android APK)
+
+> **Latest Version:** `v2.0.1` — **Free Direct Download (No Play Store Required)**
+
+1. **[Download `Pockit-v2.0.1.apk` (Latest Release)](https://github.com/Swapnil-360/pockit-student-finance/releases/latest/download/Pockit-v2.0.1.apk)** *(or browse all versions on the [GitHub Releases](https://github.com/Swapnil-360/pockit-student-finance/releases) page)*.
+2. Open the downloaded `.apk` file on your Android phone.
+3. If prompted, tap **Settings → Allow from this source** ("Install unknown apps") and tap **Install**.
+4. Launch **Pockit** — tap **"⚡ Quick Demo Mode (1-Click)"** or sign in with Google/Email to get started!
+
+**Support & Contact:** [miftahurr503@gmail.com](mailto:miftahurr503@gmail.com) · **Privacy Policy:** [`/privacy`](https://pockit-backend-eppq.onrender.com/privacy)
 
 ---
 
