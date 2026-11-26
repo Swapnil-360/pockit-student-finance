@@ -13,7 +13,7 @@ A complete, production-grade cross-platform mobile application and intelligent b
 
 > **Latest Version:** `v2.0.1` — **Free Direct Download (No Play Store Required)**
 
-1. **[Download `Pockit-v2.0.1.apk` (Latest Release)](https://github.com/Swapnil-360/pockit-student-finance/releases/latest/download/Pockit-v2.0.1.apk)** *(or browse all versions on the [GitHub Releases](https://github.com/Swapnil-360/pockit-student-finance/releases) page)*.
+1. **[Download `pockit-2.0.1.apk` (Latest Release)](https://github.com/Swapnil-360/pockit-student-finance/releases/latest/download/pockit-2.0.1.apk)** *(or browse all versions on the [GitHub Releases](https://github.com/Swapnil-360/pockit-student-finance/releases) page)*.
 2. Open the downloaded `.apk` file on your Android phone.
 3. If prompted, tap **Settings → Allow from this source** ("Install unknown apps") and tap **Install**.
 4. Launch **Pockit** — tap **"⚡ Quick Demo Mode (1-Click)"** or sign in with Google/Email to get started!
