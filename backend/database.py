@@ -3201,8 +3201,7 @@ class Database:
 
     def get_streak_offers(self, include_inactive: bool = False) -> List[Dict[str, Any]]:
         doc = self._get_global_doc("__global_streak_offers__")
-        offers = doc.get("offers")
-        if not isinstance(offers, list) or len(offers) == 0:
+        if "offers" not in doc or not isinstance(doc.get("offers"), list):
             offers = [{
                 "id": "offer_30d_smart_coach",
                 "title": "30 Days Free Smart Coach",
@@ -3215,6 +3214,8 @@ class Database:
                 "is_active": True,
                 "created_at": "2026-11-25",
             }]
+        else:
+            offers = doc["offers"]
         if include_inactive:
             return offers
         return [o for o in offers if o.get("is_active", True)]

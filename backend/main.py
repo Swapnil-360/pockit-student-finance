@@ -1401,9 +1401,18 @@ def submit_app_feedback_endpoint(req: Dict[str, Any]):
 
 @app.get("/api/announcements")
 def get_public_announcements():
-    """Returns active admin announcements & update notices for the mobile app."""
+    """Returns active admin announcements & active streak offers for the mobile app."""
     items = db.admin_get_announcements()
     active = [a for a in items if a.get("is_active", True)]
+    active_offers = db.get_streak_offers(include_inactive=False)
+    for o in active_offers:
+        active.append({
+            "id": f"offer_notice_{o.get('id')}",
+            "title": o.get("title") or "Streak Offer",
+            "message": o.get("description") or f"Reach {o.get('min_streak', 30)}-day streak for {o.get('reward_days', 30)} days Pro!",
+            "is_active": True,
+            "created_at": o.get("created_at") or "",
+        })
     return {"status": "success", "announcements": active}
 
 
