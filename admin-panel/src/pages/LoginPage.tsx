@@ -31,7 +31,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
       <div className="w-full max-w-md bg-[#1A1D21] border border-white/10 rounded-2xl p-8 shadow-2xl">
         <div className="flex flex-col items-center mb-7">
           <img
-            src="/admin/pockit_header_logo_dark.png"
+            src="./pockit_header_logo_dark.png"
             alt="Pockit"
             className="h-11 object-contain mb-4"
           />

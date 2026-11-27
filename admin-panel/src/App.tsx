@@ -62,7 +62,7 @@ export const App: React.FC = () => {
         <div>
           <div className="mb-8 px-2">
             <img
-              src="/admin/pockit_header_logo_dark.png"
+              src="./pockit_header_logo_dark.png"
               alt="Pockit"
               className="h-9 object-contain"
             />
@@ -107,7 +107,7 @@ export const App: React.FC = () => {
         {/* Mobile Header */}
         <header className="md:hidden flex items-center justify-between px-4 py-3 bg-[#16191D] border-b border-white/8">
           <img
-            src="/admin/pockit_header_logo_dark.png"
+            src="./pockit_header_logo_dark.png"
             alt="Pockit"
             className="h-8 object-contain"
           />

@@ -3803,6 +3803,19 @@ class Database:
         self._save_global_doc("__global_announcements__", {"announcements": items[:20]})
         return items[:20]
 
+    def admin_toggle_announcement(self, announcement_id: str, is_active: bool) -> List[Dict[str, Any]]:
+        items = self.admin_get_announcements()
+        for item in items:
+            if str(item.get("id")) == str(announcement_id):
+                item["is_active"] = bool(is_active)
+        self._save_global_doc("__global_announcements__", {"announcements": items[:20]})
+        return items[:20]
+
+    def admin_delete_announcement(self, announcement_id: str) -> List[Dict[str, Any]]:
+        items = [a for a in self.admin_get_announcements() if str(a.get("id")) != str(announcement_id)]
+        self._save_global_doc("__global_announcements__", {"announcements": items[:20]})
+        return items[:20]
+
     def admin_get_overview(self) -> Dict[str, Any]:
         users = self.admin_list_all_users()
         real_users = [u for u in users if u.get("id") not in ("demo_student_001", "guest_local_001")]

@@ -287,6 +287,19 @@ def admin_create_announcement(req: AdminAnnouncementRequest, admin=Depends(requi
     return {"status": "success", "announcements": items}
 
 
+@router.put("/announcements/{announcement_id}")
+def admin_toggle_announcement(announcement_id: str, payload: Dict[str, Any], admin=Depends(require_admin)):
+    is_active = bool(payload.get("is_active", True))
+    items = db.admin_toggle_announcement(announcement_id, is_active)
+    return {"status": "success", "announcements": items}
+
+
+@router.delete("/announcements/{announcement_id}")
+def admin_delete_announcement(announcement_id: str, admin=Depends(require_admin)):
+    items = db.admin_delete_announcement(announcement_id)
+    return {"status": "success", "announcements": items}
+
+
 # --- Streaming CSV / JSON Exports ---
 def _export_response(rows: List[Dict[str, Any]], filename_base: str, fmt: str):
     if fmt.lower() == "csv":

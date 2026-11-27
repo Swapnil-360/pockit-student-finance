@@ -115,6 +115,15 @@ export const saveAnnouncement = (title: string, message: string, is_active = tru
     method: 'POST',
     body: JSON.stringify({ title, message, is_active }),
   });
+export const toggleAnnouncement = (id: string, is_active: boolean) =>
+  adminFetch(`/api/admin/announcements/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    body: JSON.stringify({ is_active }),
+  });
+export const deleteAnnouncement = (id: string) =>
+  adminFetch(`/api/admin/announcements/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  });
 
 export async function downloadExportFile(endpoint: string, filename: string) {
   const token = getAdminToken();
