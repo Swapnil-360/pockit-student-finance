@@ -13,6 +13,7 @@ import {
   Switch,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../constants/ThemeContext';
@@ -63,16 +64,35 @@ export const MessMealTrackerModal: React.FC<MessMealTrackerModalProps> = ({
   const fontEnLabel = Platform.select({ web: '"Inter", -apple-system, sans-serif', default: undefined });
 
   const loadSummary = async () => {
-    setLoading(true);
+    const cacheKey = `@pockit_mess_${userId}`;
+    let hasCached = false;
+    try {
+      const cachedRaw = await AsyncStorage.getItem(cacheKey);
+      if (cachedRaw) {
+        const cached: MessSummary = JSON.parse(cachedRaw);
+        hasCached = true;
+        setSummary(cached);
+        if (cached.meals_by_date && cached.meals_by_date[todayStr] !== undefined) {
+          setSelectedCount(cached.meals_by_date[todayStr]);
+        } else if (cached.daily_meal_count !== undefined) {
+          setSelectedCount(cached.daily_meal_count);
+        }
+        setNewRate(String(cached.estimated_meal_rate));
+      }
+    } catch {}
+
+    if (!hasCached) setLoading(true);
     try {
       const data = await fetchMessSummary(userId);
       setSummary(data);
       if (data.meals_by_date && data.meals_by_date[todayStr] !== undefined) {
         setSelectedCount(data.meals_by_date[todayStr]);
+      } else if (data.daily_meal_count !== undefined) {
+        setSelectedCount(data.daily_meal_count);
       }
       setNewRate(String(data.estimated_meal_rate));
     } catch (e) {
-      // offline fallback
+      // offline fallback already loaded from cache
     } finally {
       setLoading(false);
     }
@@ -93,12 +113,14 @@ export const MessMealTrackerModal: React.FC<MessMealTrackerModalProps> = ({
       const advance = Number(next.meal_advance_paid || 0);
       const consumed = Number((totalMeals * rate).toFixed(2));
       const diff = Number((advance - consumed).toFixed(2));
-      return {
+      const updated = {
         ...next,
         consumed_food_cost: consumed,
         balance_status: diff >= 0 ? 'surplus' : 'deficit',
         balance_amount: Math.abs(diff),
-      };
+      } as MessSummary;
+      AsyncStorage.setItem(`@pockit_mess_${userId}`, JSON.stringify(updated)).catch(() => {});
+      return updated;
     });
   };
 
@@ -112,6 +134,7 @@ export const MessMealTrackerModal: React.FC<MessMealTrackerModalProps> = ({
       const nextMeals = Math.max(0, Number((summary.total_meals - prevCount + count).toFixed(2)));
       applyOptimisticSummary({
         total_meals: nextMeals,
+        daily_meal_count: count,
         meals_by_date: { ...(summary.meals_by_date || {}), [todayStr]: count },
       });
     }

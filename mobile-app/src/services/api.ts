@@ -2069,6 +2069,7 @@ export interface MessSummary {
   days_logged: number;
   meals_by_date: Record<string, number>;
   enable_mess_meals?: boolean;
+  daily_meal_count?: number;
 }
 
 export async function fetchMessSummary(userId: string, month?: string): Promise<MessSummary> {

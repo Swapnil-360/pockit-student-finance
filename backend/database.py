@@ -12,6 +12,7 @@ import hashlib
 import json
 import math
 import sqlite3
+import time
 import uuid
 from datetime import datetime, timedelta
 import calendar
@@ -365,6 +366,11 @@ class Database:
 
             try:
                 cursor.execute("ALTER TABLE profiles ADD COLUMN enable_mess_meals INTEGER DEFAULT NULL")
+            except Exception:
+                pass
+
+            try:
+                cursor.execute("ALTER TABLE profiles ADD COLUMN daily_meal_count REAL DEFAULT 1.0")
             except Exception:
                 pass
 
@@ -1252,7 +1258,7 @@ class Database:
                         track_spending, mobile_banking_use, borrowed_from_friends_baseline,
                         aware_balance, aware_weekly_track, aware_check_before_buy,
                         impulse_spontaneous, impulse_discounts, impulse_regret,
-                        awareness_score, impulse_score, enable_mess_meals, updated_at
+                        awareness_score, impulse_score, enable_mess_meals, estimated_meal_rate, daily_meal_count, updated_at
                     ) VALUES (
                         ?, ?, ?, ?, ?, ?,
                         ?, ?, ?,
@@ -1261,7 +1267,7 @@ class Database:
                         ?, ?, ?,
                         ?, ?, ?,
                         ?, ?, ?,
-                        ?, ?, ?, CURRENT_TIMESTAMP
+                        ?, ?, ?, ?, ?, CURRENT_TIMESTAMP
                     )
                 """, (
                     user_id,
@@ -1291,7 +1297,9 @@ class Database:
                     int(p.get('impulse_regret') or 3),
                     aware_score,
                     impulse_score,
-                    enable_mess
+                    enable_mess,
+                    float(p.get('estimated_meal_rate') or 50.0),
+                    float(p.get('daily_meal_count') if p.get('daily_meal_count') is not None else 1.0)
                 ))
                 conn.commit()
         except Exception as e:
@@ -1323,7 +1331,7 @@ class Database:
                     sb_prof = res.data[0]
                     extra_settings = self._get_user_settings_from_supabase(user_id)
                     if extra_settings:
-                        for k in ('mess_meal_fixed', 'academic_fee_fixed', 'transport_fixed', 'enable_mess_meals', 'estimated_meal_rate', 'target_savings'):
+                        for k in ('mess_meal_fixed', 'academic_fee_fixed', 'transport_fixed', 'enable_mess_meals', 'estimated_meal_rate', 'daily_meal_count', 'target_savings'):
                             if k in extra_settings and extra_settings[k] is not None:
                                 sb_prof[k] = extra_settings[k]
                     self._restore_profile_to_sqlite(user_id, sb_prof)
@@ -2263,7 +2271,12 @@ class Database:
         return datetime.utcnow() + timedelta(hours=6)
 
     def _get_global_30_winners(self) -> List[Dict[str, Any]]:
-        """Reads the persistent First-100 30-day streak winners list from Supabase or local SQLite."""
+        """Reads the persistent First-100 30-day streak winners list from Supabase or local SQLite (with 60s cache)."""
+        now_ts = time.time()
+        cache = getattr(self, "_winners_cache", None)
+        if cache and (now_ts - cache[0]) < 60.0:
+            return list(cache[1])
+
         if self.supabase:
             try:
                 res = (
@@ -2278,6 +2291,7 @@ class Database:
                     parsed = raw if isinstance(raw, dict) else (json.loads(raw) if isinstance(raw, str) else {})
                     winners = parsed.get('winners', [])
                     if isinstance(winners, list):
+                        self._winners_cache = (now_ts, list(winners))
                         return winners
             except Exception as e:
                 print(f"[Supabase sync notice] _get_global_30_winners: {e}")
@@ -2291,13 +2305,16 @@ class Database:
                     parsed = json.loads(row["summary_json"])
                     winners = parsed.get("winners", [])
                     if isinstance(winners, list):
+                        self._winners_cache = (now_ts, list(winners))
                         return winners
                 except Exception:
                     pass
+        self._winners_cache = (now_ts, [])
         return []
 
     def _save_global_30_winners(self, owner_user_id: str, winners: List[Dict[str, Any]]):
         """Persists the First-100 30-day streak winners registry to SQLite and Supabase."""
+        self._winners_cache = (time.time(), list(winners[:100]))
         global_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, "__global_streak_30_winners__"))
         payload_json = json.dumps({"winners": winners[:100]})
 
@@ -2365,32 +2382,32 @@ class Database:
         if last_date and last_date not in active_dates:
             active_dates.append(last_date)
 
+        # Compute continuous streak strictly from active_dates so streak count always matches calendar/weekly dots
         changed = False
         if check_in_today:
-            if last_date == today_str:
-                current_streak = max(1, current_streak)
-            elif last_date == yesterday_str:
-                current_streak = max(1, current_streak + 1)
-                last_date = today_str
-                changed = True
-            else:
-                # Strict reset when >= 1 day was missed (or first day)
-                current_streak = 1
-                last_date = today_str
-                changed = True
-
             if today_str not in active_dates:
                 active_dates.append(today_str)
                 changed = True
-        else:
-            # Read-only check: if user missed yesterday and hasn't checked in today, streak is broken (0)
-            if last_date not in (today_str, yesterday_str):
-                if current_streak != 0:
-                    current_streak = 0
-                    changed = True
+            if last_date != today_str:
+                last_date = today_str
+                changed = True
+
+        active_dates = sorted(set(d for d in active_dates if isinstance(d, str) and len(d) == 10))[-70:]
+        active_set = set(active_dates)
+
+        anchor_dt = now_dt if today_str in active_set else (now_dt - timedelta(days=1))
+        computed_streak = 0
+        if anchor_dt.strftime("%Y-%m-%d") in active_set:
+            cur_dt = anchor_dt
+            while cur_dt.strftime("%Y-%m-%d") in active_set:
+                computed_streak += 1
+                cur_dt = cur_dt - timedelta(days=1)
+
+        if computed_streak != current_streak:
+            current_streak = computed_streak
+            changed = True
 
         longest_streak = max(longest_streak, current_streak)
-        active_dates = sorted(set(d for d in active_dates if isinstance(d, str) and len(d) == 10))[-70:]
 
         # Monthly 80% consistency target
         month_prefix = now_dt.strftime("%Y-%m")
@@ -2916,6 +2933,7 @@ class Database:
 
     def log_mess_meal(self, user_id: str, date: str, meal_count: float, note: Optional[str] = None) -> Dict[str, Any]:
         meal_id = str(uuid.uuid4())
+        count_val = float(meal_count)
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
@@ -2924,20 +2942,25 @@ class Database:
                 ON CONFLICT(user_id, date) DO UPDATE SET
                     meal_count = excluded.meal_count,
                     note = excluded.note
-            """, (meal_id, user_id, date, float(meal_count), (note or "").strip()))
+            """, (meal_id, user_id, date, count_val, (note or "").strip()))
+            cursor.execute("UPDATE profiles SET daily_meal_count = ? WHERE user_id = ?", (count_val, user_id))
             conn.commit()
         self._sync_mess_meals_to_supabase(user_id)
+        self._save_user_settings_to_supabase(user_id, {"daily_meal_count": count_val})
 
-        return {"status": "success", "user_id": user_id, "date": date, "meal_count": float(meal_count)}
+        return {"status": "success", "user_id": user_id, "date": date, "meal_count": count_val, "daily_meal_count": count_val}
 
     def get_mess_summary(self, user_id: str, month: Optional[str] = None) -> Dict[str, Any]:
         now = self._dhaka_now()
         month_str = month or now.strftime("%Y-%m")
+        today_str = now.strftime("%Y-%m-%d")
         profile = self.get_profile(user_id) or {}
         self._restore_mess_meals_from_supabase(user_id)
 
         meal_advance_paid = float(profile.get("mess_meal_fixed", 0.0))
         estimated_meal_rate = float(profile.get("estimated_meal_rate") or 50.0)
+        enable_mess = bool(profile.get("enable_mess_meals", True))
+        daily_meal_count = float(profile.get("daily_meal_count") if profile.get("daily_meal_count") is not None else 1.0)
 
         with self._get_connection() as conn:
             cursor = conn.cursor()
@@ -2948,6 +2971,38 @@ class Database:
                 ORDER BY date ASC
             """, (user_id, f"{month_str}%"))
             rows = cursor.fetchall()
+
+            # Auto-carry forward recurring daily_meal_count for unlogged days up to today
+            if month_str == now.strftime("%Y-%m") and enable_mess and daily_meal_count > 0:
+                logged_daily_dates = [r[0] for r in rows if not str(r[0]).endswith("-00")]
+                if logged_daily_dates and today_str not in logged_daily_dates:
+                    last_logged = max(logged_daily_dates)
+                    if last_logged < today_str:
+                        try:
+                            cur_dt = datetime.strptime(last_logged, "%Y-%m-%d") + timedelta(days=1)
+                            end_dt = datetime.strptime(today_str, "%Y-%m-%d")
+                            added_any = False
+                            while cur_dt <= end_dt:
+                                d_str = cur_dt.strftime("%Y-%m-%d")
+                                if d_str.startswith(month_str):
+                                    cursor.execute("""
+                                        INSERT OR IGNORE INTO mess_meals (id, user_id, date, meal_count, note)
+                                        VALUES (?, ?, ?, ?, ?)
+                                    """, (str(uuid.uuid4()), user_id, d_str, daily_meal_count, "Auto daily meal"))
+                                    added_any = True
+                                cur_dt += timedelta(days=1)
+                            if added_any:
+                                conn.commit()
+                                cursor.execute("""
+                                    SELECT date, meal_count, note
+                                    FROM mess_meals
+                                    WHERE user_id = ? AND date LIKE ?
+                                    ORDER BY date ASC
+                                """, (user_id, f"{month_str}%"))
+                                rows = cursor.fetchall()
+                                self._sync_mess_meals_to_supabase(user_id)
+                        except Exception as e:
+                            print(f"[Mess auto-fill notice]: {e}")
 
         meals_by_date = {}
         total_meals = 0.0
@@ -2972,7 +3027,8 @@ class Database:
             "balance_amount": abs(balance),
             "days_logged": len([k for k in meals_by_date.keys() if not k.endswith("-00")]),
             "meals_by_date": meals_by_date,
-            "enable_mess_meals": profile.get("enable_mess_meals", True)
+            "enable_mess_meals": enable_mess,
+            "daily_meal_count": daily_meal_count,
         }
 
     def toggle_mess_meal_system(self, user_id: str, enable: bool) -> bool:

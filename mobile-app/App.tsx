@@ -241,10 +241,12 @@ function AppContent() {
           setIsLocked(true);
         }
 
-        // 1. Immediately check local cache so existing accounts never get forced into Onboarding on Render cold starts
-        const cachedOnboarded = await AsyncStorage.getItem(`@student_has_onboarded_${result.user.id}`);
-        const cachedProfile = await AsyncStorage.getItem(`@student_profile_${result.user.id}`);
-        const cachedDashStr = await AsyncStorage.getItem(STORAGE_KEYS.DASHBOARD_CACHE);
+        // 1. Immediately check local cache in parallel so existing accounts open instantaneously
+        const [cachedOnboarded, cachedProfile, cachedDashStr] = await Promise.all([
+          AsyncStorage.getItem(`@student_has_onboarded_${result.user.id}`),
+          AsyncStorage.getItem(`@student_profile_${result.user.id}`),
+          AsyncStorage.getItem(STORAGE_KEYS.DASHBOARD_CACHE),
+        ]);
 
         const isKnownOnboarded =
           cachedOnboarded === 'true' ||
@@ -259,28 +261,38 @@ function AppContent() {
               setDashboard(JSON.parse(cachedDashStr));
             } catch {}
           }
+          // Dismiss splash immediately when cached data is available; refresh in background
+          setSplashActive(false);
         }
 
-        // 2. Refresh profile and dashboard asynchronously in background
-        try {
-          const profile = await getStudentProfile(result.user.id);
-          const onboarded = profile !== null || isKnownOnboarded;
-          setHasProfile(onboarded);
-          if (onboarded) {
-            if (profile) {
-              await AsyncStorage.setItem(`@student_has_onboarded_${result.user.id}`, 'true');
-              await AsyncStorage.setItem(`@student_profile_${result.user.id}`, JSON.stringify(profile));
+        // 2. Refresh profile and dashboard in parallel (non-blocking if cached)
+        const refreshTask = (async () => {
+          try {
+            const [profile, dash] = await Promise.all([
+              getStudentProfile(result.user!.id).catch(() => null),
+              fetchDashboard(result.user!.id).catch(() => null),
+            ]);
+            const onboarded = profile !== null || isKnownOnboarded;
+            setHasProfile(onboarded);
+            if (onboarded) {
+              if (profile) {
+                AsyncStorage.setItem(`@student_has_onboarded_${result.user!.id}`, 'true').catch(() => {});
+                AsyncStorage.setItem(`@student_profile_${result.user!.id}`, JSON.stringify(profile)).catch(() => {});
+              }
+              if (dash) setDashboard(dash);
+            } else {
+              setDashboard(null);
             }
-            const dash = await fetchDashboard(result.user.id);
-            if (dash) setDashboard(dash);
-          } else {
-            setDashboard(null);
+          } catch {
+            if (!isKnownOnboarded) {
+              setHasProfile(false);
+              setDashboard(null);
+            }
           }
-        } catch {
-          if (!isKnownOnboarded) {
-            setHasProfile(false);
-            setDashboard(null);
-          }
+        })();
+
+        if (!isKnownOnboarded) {
+          await refreshTask;
         }
       }
 

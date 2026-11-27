@@ -12,7 +12,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TRANSLATIONS, Language } from '../constants/translations';
 import { BRANDING } from '../constants/branding';
-import { getStoredUser, UserData } from '../services/api';
+import { getStoredUser, UserData, API_BASE_URL } from '../services/api';
 import { hasPinConfigured } from '../services/security';
 
 interface SplashScreenProps {
@@ -41,6 +41,9 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ language, onFinish }
         onFinish(payload);
       }
     };
+
+    // Pre-warm backend server while splash animation plays
+    fetch(`${API_BASE_URL}/health`).catch(() => {});
 
     // 1. Smooth entry animations
     Animated.parallel([

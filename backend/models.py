@@ -728,5 +728,6 @@ class MessSummaryResponse(BaseModel):
     days_logged: int
     meals_by_date: Dict[str, float]
     enable_mess_meals: bool = True
+    daily_meal_count: float = 1.0
 
 
