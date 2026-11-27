@@ -2029,7 +2029,49 @@ class Database:
         data["is_active"] = bool(data.get("is_active", 1))
         return data
 
+    def _restore_goals_from_supabase(self, user_id: str):
+        """Restores savings_goals from Supabase into local SQLite when SQLite has 0 goals for user."""
+        if not self.supabase:
+            return
+        try:
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT COUNT(*) FROM savings_goals WHERE user_id = ?", (user_id,))
+                count = cursor.fetchone()[0]
+            if count == 0:
+                sb_uid = self._to_uuid(user_id)
+                sb_res = self.supabase.table('savings_goals').select('*').eq('user_id', sb_uid).execute()
+                if sb_res.data:
+                    with self._get_connection() as conn:
+                        cursor = conn.cursor()
+                        for g in sb_res.data:
+                            cursor.execute("""
+                                INSERT OR REPLACE INTO savings_goals (
+                                    id, user_id, title, target_amount, current_saved,
+                                    monthly_commitment, is_paused, missed_months, category, start_date, is_active,
+                                    created_at, updated_at
+                                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            """, (
+                                g.get('id', str(uuid.uuid4())),
+                                user_id,
+                                g.get('title', 'Dream Goal'),
+                                float(g.get('target_amount') or 0),
+                                float(g.get('current_saved') or 0),
+                                float(g.get('monthly_commitment') or 500),
+                                1 if g.get('is_paused') else 0,
+                                int(g.get('missed_months') or 0),
+                                g.get('category', 'Gadget'),
+                                g.get('start_date', datetime.now().strftime("%Y-%m-%d")),
+                                1 if g.get('is_active') else 0,
+                                g.get('created_at', datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+                                g.get('updated_at', datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+                            ))
+                        conn.commit()
+        except Exception as e:
+            print(f"[Supabase sync notice] _restore_goals_from_supabase: {e}")
+
     def get_active_goal(self, user_id: str) -> Optional[Dict[str, Any]]:
+        self._restore_goals_from_supabase(user_id)
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
@@ -2044,44 +2086,7 @@ class Database:
             return self._format_goal_data(row)
 
     def get_user_goals(self, user_id: str) -> List[Dict[str, Any]]:
-        # 1. If SQLite has 0 goals for this user and Supabase is active, restore from Supabase
-        if self.supabase:
-            try:
-                with self._get_connection() as conn:
-                    cursor = conn.cursor()
-                    cursor.execute("SELECT COUNT(*) FROM savings_goals WHERE user_id = ?", (user_id,))
-                    count = cursor.fetchone()[0]
-                if count == 0:
-                    sb_uid = self._to_uuid(user_id)
-                    sb_res = self.supabase.table('savings_goals').select('*').eq('user_id', sb_uid).execute()
-                    if sb_res.data:
-                        with self._get_connection() as conn:
-                            cursor = conn.cursor()
-                            for g in sb_res.data:
-                                cursor.execute("""
-                                    INSERT OR REPLACE INTO savings_goals (
-                                        id, user_id, title, target_amount, current_saved,
-                                        monthly_commitment, is_paused, missed_months, category, start_date, is_active,
-                                        created_at, updated_at
-                                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                                """, (
-                                    g.get('id', str(uuid.uuid4())),
-                                    user_id,
-                                    g.get('title', 'Dream Goal'),
-                                    float(g.get('target_amount') or 0),
-                                    float(g.get('current_saved') or 0),
-                                    float(g.get('monthly_commitment') or 500),
-                                    1 if g.get('is_paused') else 0,
-                                    int(g.get('missed_months') or 0),
-                                    g.get('category', 'Gadget'),
-                                    g.get('start_date', datetime.now().strftime("%Y-%m-%d")),
-                                    1 if g.get('is_active') else 0,
-                                    g.get('created_at', datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
-                                    g.get('updated_at', datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-                                ))
-                            conn.commit()
-            except Exception as e:
-                print(f"[Supabase sync notice] get_user_goals restore: {e}")
+        self._restore_goals_from_supabase(user_id)
 
         with self._get_connection() as conn:
             cursor = conn.cursor()
@@ -2136,6 +2141,7 @@ class Database:
 
         if self.supabase:
             try:
+                self.supabase.table('savings_goals').update({'is_active': False}).eq('user_id', self._to_uuid(user_id)).execute()
                 full_goal = {
                     'id': self._to_uuid(goal_id),
                     'user_id': self._to_uuid(user_id),
@@ -2162,6 +2168,7 @@ class Database:
         return self.get_active_goal(user_id)
 
     def boost_savings_goal(self, goal_id: str, user_id: str, amount: float) -> Dict[str, Any]:
+        self._restore_goals_from_supabase(user_id)
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
@@ -2171,7 +2178,10 @@ class Database:
             """, (amount, goal_id, user_id))
             conn.commit()
 
-        goal = self.get_active_goal(user_id)
+            cursor.execute("SELECT * FROM savings_goals WHERE id = ? AND user_id = ?", (goal_id, user_id))
+            row = cursor.fetchone()
+            goal = self._format_goal_data(row) if row else self.get_active_goal(user_id)
+
         if goal and goal.get("planning_mode") == "target_timeline" and not goal.get("is_paused"):
             new_required = goal.get("required_monthly_savings", goal.get("monthly_commitment"))
             with self._get_connection() as conn:
@@ -2187,16 +2197,32 @@ class Database:
 
         if self.supabase and goal:
             try:
-                self.supabase.table('savings_goals').update({
+                res = self.supabase.table('savings_goals').update({
                     'current_saved': float(goal['current_saved']),
                     'monthly_commitment': float(goal.get('monthly_commitment', 500.0)),
-                }).eq('id', self._to_uuid(goal_id)).execute()
+                }).eq('id', self._to_uuid(goal['id'])).execute()
+                if not res.data:
+                    sb_goal = {
+                        'id': self._to_uuid(goal['id']),
+                        'user_id': self._to_uuid(user_id),
+                        'title': goal.get('title', 'Dream Goal'),
+                        'target_amount': float(goal.get('target_amount', 0)),
+                        'current_saved': float(goal['current_saved']),
+                        'monthly_commitment': float(goal.get('monthly_commitment', 500.0)),
+                        'is_paused': bool(goal.get('is_paused', False)),
+                        'missed_months': int(goal.get('missed_months', 0)),
+                        'category': goal.get('category', 'Gadget'),
+                        'start_date': goal.get('start_date', datetime.now().strftime("%Y-%m-%d")),
+                        'is_active': bool(goal.get('is_active', True)),
+                    }
+                    self.supabase.table('savings_goals').insert(sb_goal).execute()
             except Exception as e:
                 print(f"[Supabase sync notice] boost_savings_goal: {e}")
 
         return goal
 
     def toggle_goal_pause(self, goal_id: str, user_id: str) -> Dict[str, Any]:
+        self._restore_goals_from_supabase(user_id)
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT is_paused, missed_months, planning_mode FROM savings_goals WHERE id = ? AND user_id = ?", (goal_id, user_id))
