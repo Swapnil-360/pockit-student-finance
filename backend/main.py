@@ -1399,6 +1399,14 @@ def submit_app_feedback_endpoint(req: Dict[str, Any]):
     return {"status": "success", "feedback": entry}
 
 
+@app.get("/api/announcements")
+def get_public_announcements():
+    """Returns active admin announcements & update notices for the mobile app."""
+    items = db.admin_get_announcements()
+    active = [a for a in items if a.get("is_active", True)]
+    return {"status": "success", "announcements": active}
+
+
 @app.post("/feedback", response_model=FeedbackResponse)
 def submit_feedback(feedback: FeedbackRequest):
     try:

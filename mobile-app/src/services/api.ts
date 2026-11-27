@@ -2072,6 +2072,32 @@ export interface MessSummary {
   daily_meal_count?: number;
 }
 
+export interface AppAnnouncement {
+  id: string;
+  title: string;
+  message: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+export async function fetchAnnouncements(): Promise<AppAnnouncement[]> {
+  const cacheKey = '@pockit_announcements_cache';
+  try {
+    const res = await fetchWithTimeout(`${API_BASE_URL}/api/announcements`, {}, 10000);
+    if (res.ok) {
+      const data = await res.json();
+      const items: AppAnnouncement[] = Array.isArray(data?.announcements) ? data.announcements : [];
+      await AsyncStorage.setItem(cacheKey, JSON.stringify(items));
+      return items;
+    }
+  } catch {}
+  try {
+    const cached = await AsyncStorage.getItem(cacheKey);
+    if (cached) return JSON.parse(cached);
+  } catch {}
+  return [];
+}
+
 export async function fetchMessSummary(userId: string, month?: string): Promise<MessSummary> {
   const url = month ? `${API_BASE_URL}/api/mess/${userId}?month=${month}` : `${API_BASE_URL}/api/mess/${userId}`;
   const cacheKey = `@pockit_mess_${userId}`;

@@ -11,6 +11,7 @@ import {
   Image,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../constants/ThemeContext';
@@ -18,9 +19,10 @@ import { TRANSLATIONS, Language } from '../constants/translations';
 import { BRANDING } from '../constants/branding';
 import { BrandLogo } from '../components/BrandLogo';
 import { GlassCard } from '../components/GlassCard';
-import { DashboardData, UserData, SavingsGoal, StreakSummary, toggleGoalPause } from '../services/api';
+import { DashboardData, UserData, SavingsGoal, StreakSummary, AppAnnouncement, fetchAnnouncements, toggleGoalPause } from '../services/api';
 import { RiskDetailsModal } from '../components/RiskDetailsModal';
 import { FeatureWalkthroughModal } from '../components/FeatureWalkthroughModal';
+import { NotificationsModal } from '../components/NotificationsModal';
 import { StreakDetailsModal } from '../components/StreakDetailsModal';
 import { TargetSavingsModal } from '../components/TargetSavingsModal';
 import { SavingsGoalCard } from '../components/SavingsGoalCard';
@@ -31,7 +33,7 @@ import { UserAvatar } from '../components/UserAvatar';
 import { DisciplineTracker } from '../components/DisciplineTracker';
 import { CompactRiskGauge } from '../components/CompactRiskGauge';
 import { MessMealTrackerModal } from '../components/MessMealTrackerModal';
-import { sendHighRiskAlertNotification } from '../services/notifications';
+import { sendHighRiskAlertNotification, sendAnnouncementLocalNotification } from '../services/notifications';
 import { getRandomQuote, getNextQuote, MotivationalQuote } from '../constants/quotes';
 import { getCallingName } from '../utils/nameHelper';
 import { getGoalIconName } from '../constants/goalIcons';
@@ -83,6 +85,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const scrollRef = useRef<any>(null);
   const [riskDetailsVisible, setRiskDetailsVisible] = useState(false);
   const [walkthroughVisible, setWalkthroughVisible] = useState(false);
+  const [notificationsVisible, setNotificationsVisible] = useState(false);
+  const [announcements, setAnnouncements] = useState<AppAnnouncement[]>([]);
+  const [readAnnouncementIds, setReadAnnouncementIds] = useState<string[]>([]);
+  const [loadingAnnouncements, setLoadingAnnouncements] = useState(false);
   const [streakModalVisible, setStreakModalVisible] = useState(false);
 
   const resolvedStreakSummary: StreakSummary = React.useMemo(() => {
@@ -158,6 +164,63 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   }, [dashboard.active_goal]);
 
   const statusBarPad = Math.max(insets.top, Platform.OS === 'android' ? (StatusBar.currentHeight || 36) : 44) + 8;
+
+  // Load & track admin announcements / notifications
+  useEffect(() => {
+    let active = true;
+    const loadNotices = async () => {
+      setLoadingAnnouncements(true);
+      try {
+        const [items, readRaw, notifiedRaw] = await Promise.all([
+          fetchAnnouncements(),
+          AsyncStorage.getItem('@pockit_read_announcement_ids'),
+          AsyncStorage.getItem('@pockit_notified_announcement_ids'),
+        ]);
+        if (!active) return;
+        const readIds: string[] = readRaw ? JSON.parse(readRaw) : [];
+        const notifiedIds: string[] = notifiedRaw ? JSON.parse(notifiedRaw) : [];
+        setAnnouncements(items);
+        setReadAnnouncementIds(readIds);
+
+        // Fire a local OS notification for the newest unseen announcement once
+        const newestUnnotified = items.find((a) => !notifiedIds.includes(a.id) && !readIds.includes(a.id));
+        if (newestUnnotified) {
+          sendAnnouncementLocalNotification(newestUnnotified.title, newestUnnotified.message).catch(() => {});
+          const nextNotified = Array.from(new Set([...notifiedIds, ...items.map((i) => i.id)])).slice(-50);
+          AsyncStorage.setItem('@pockit_notified_announcement_ids', JSON.stringify(nextNotified)).catch(() => {});
+        }
+      } catch {}
+      finally {
+        if (active) setLoadingAnnouncements(false);
+      }
+    };
+    loadNotices();
+    return () => {
+      active = false;
+    };
+  }, [dashboard.month]);
+
+  const unreadAnnouncementIds = React.useMemo(
+    () => announcements.filter((a) => !readAnnouncementIds.includes(a.id)).map((a) => a.id),
+    [announcements, readAnnouncementIds]
+  );
+
+  const handleOpenNotifications = async () => {
+    try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
+    setNotificationsVisible(true);
+    if (announcements.length > 0) {
+      const merged = Array.from(new Set([...readAnnouncementIds, ...announcements.map((a) => a.id)])).slice(-100);
+      AsyncStorage.setItem('@pockit_read_announcement_ids', JSON.stringify(merged)).catch(() => {});
+      // Keep unreadIds for this modal view, then update badge after closing
+    }
+  };
+
+  const handleCloseNotifications = () => {
+    setNotificationsVisible(false);
+    if (announcements.length > 0) {
+      setReadAnnouncementIds((prev) => Array.from(new Set([...prev, ...announcements.map((a) => a.id)])).slice(-100));
+    }
+  };
 
   // Check and fire high-risk push alert if risk is >= 70%
   useEffect(() => {
@@ -299,7 +362,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </View>
 
           <View style={styles.headerRightActions}>
-            {/* Proper App Guide & Feature Info (ℹ️) Button (Clear guide for new & returning users) */}
+            {/* Notification Bell Button (Admin Announcements & App Updates) */}
             <TouchableOpacity
               style={[
                 styles.infoGuideBtn,
@@ -309,15 +372,23 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   shadowColor: isDark ? '#000000' : '#EA580C',
                 },
               ]}
-              onPress={() => {
-                try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
-                setWalkthroughVisible(true);
-              }}
+              onPress={handleOpenNotifications}
               activeOpacity={0.75}
               accessibilityRole="button"
-              accessibilityLabel="App Features and User Guide"
+              accessibilityLabel="Notifications and Announcements"
             >
-              <Ionicons name="information" size={20} color="#EA580C" />
+              <Ionicons
+                name={unreadAnnouncementIds.length > 0 ? 'notifications' : 'notifications-outline'}
+                size={20}
+                color="#EA580C"
+              />
+              {unreadAnnouncementIds.length > 0 && (
+                <View style={styles.bellBadge}>
+                  <Text style={styles.bellBadgeText}>
+                    {unreadAnnouncementIds.length > 9 ? '9+' : unreadAnnouncementIds.length}
+                  </Text>
+                </View>
+              )}
             </TouchableOpacity>
 
             <UserAvatar
@@ -804,6 +875,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         language={language}
       />
 
+      {/* Notifications & Admin Announcements Modal */}
+      <NotificationsModal
+        visible={notificationsVisible}
+        onClose={handleCloseNotifications}
+        announcements={announcements}
+        unreadIds={unreadAnnouncementIds}
+        loading={loadingAnnouncements}
+        language={language}
+        onOpenAppGuide={() => setWalkthroughVisible(true)}
+      />
+
       {/* Interactive Feature Walkthrough Guide Modal */}
       <FeatureWalkthroughModal
         visible={walkthroughVisible}
@@ -868,6 +950,26 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 5,
     elevation: 2,
+    position: 'relative',
+  },
+  bellBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#EF4444',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+  },
+  bellBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '800',
   },
   greetingSection: {
     marginBottom: 16,

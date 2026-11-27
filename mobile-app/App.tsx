@@ -21,6 +21,7 @@ import { SplashScreen } from './src/screens/SplashScreen';
 import { PinLockScreen } from './src/screens/PinLockScreen';
 import { AuthScreen } from './src/screens/AuthScreen';
 import { OnboardingWizard } from './src/screens/OnboardingWizard';
+import { syncDailyReminderFromStorage } from './src/services/notifications';
 import { HomeScreen } from './src/screens/HomeScreen';
 import { CalendarLedgerScreen } from './src/screens/CalendarLedgerScreen';
 import { AiCoachScreen } from './src/screens/AiCoachScreen';
@@ -229,6 +230,12 @@ function AppContent() {
       linkSub.remove();
     };
   }, [user]);
+
+  useEffect(() => {
+    if (user) {
+      syncDailyReminderFromStorage(language).catch(() => {});
+    }
+  }, [user?.id, language]);
 
   const handleSplashFinish = async (result: {
     user: UserData | null;

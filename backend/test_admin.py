@@ -57,6 +57,11 @@ def test_admin_suite():
     assert mi_res.status_code == 200
     assert mi_res.json()["model_exists"] is True
 
+    # 9. Public announcements endpoint
+    ann_res = client.get("/api/announcements")
+    assert ann_res.status_code == 200
+    assert "announcements" in ann_res.json()
+
     print("ALL ADMIN PANEL TESTS PASSED!")
 
 

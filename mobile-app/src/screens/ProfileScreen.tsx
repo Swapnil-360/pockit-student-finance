@@ -38,7 +38,13 @@ import {
   submitAppFeedback,
   UserData,
 } from '../services/api';
-import { scheduleDailySpendingReminder } from '../services/notifications';
+import {
+  scheduleDailySpendingReminder,
+  cancelDailySpendingReminder,
+  getDailyReminderSettings,
+  saveDailyReminderSettings,
+  sendTestReminderNotification,
+} from '../services/notifications';
 import { supabase } from '../services/supabaseClient';
 import { getCallingName, suggestCallingNames } from '../utils/nameHelper';
 
@@ -107,6 +113,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
   // App Preferences State
   const [dailyReminderEnabled, setDailyReminderEnabled] = useState(true);
+  const [reminderHour, setReminderHour] = useState(21);
+  const [reminderMinute, setReminderMinute] = useState(30);
+  const [reminderModalVisible, setReminderModalVisible] = useState(false);
   const [walkthroughVisible, setWalkthroughVisible] = useState(false);
 
   // Account Management State
@@ -130,7 +139,19 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     loadProfile();
     loadSubscription();
     loadStreakStats();
+    getDailyReminderSettings().then((s) => {
+      setDailyReminderEnabled(s.enabled);
+      setReminderHour(s.hour);
+      setReminderMinute(s.minute);
+    });
   }, [user.id]);
+
+  const formatReminderTime = (h: number, m: number) => {
+    const period = h >= 12 ? 'PM' : 'AM';
+    const hour12 = h % 12 === 0 ? 12 : h % 12;
+    const minStr = m < 10 ? `0${m}` : `${m}`;
+    return `${hour12}:${minStr} ${period}`;
+  };
 
   useEffect(() => {
     if (typeof initialStreak === 'number' && initialStreak > 0) {
@@ -783,25 +804,54 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
           {/* Row 3: Daily Spending Reminder */}
           <View style={styles.preferenceRow}>
-            <View style={[styles.prefIconBox, { backgroundColor: 'rgba(245, 158, 11, 0.15)' }]}>
-              <Ionicons name="notifications" size={16} color="#D97706" />
-            </View>
-            <View style={styles.prefTextCol}>
-              <Text style={[styles.prefTitle, { color: theme.textPrimary }]}>
-                {language === 'bn' ? 'দৈনিক খরচের রিমাইন্ডার' : 'Daily Spending Reminder'}
-              </Text>
-              <Text style={[styles.prefSub, { color: theme.textSecondary }]}>
-                {language === 'bn' ? 'রাত ৯:৩০ টায় হিসাব লগের নোটিফিকেশন' : '9:30 PM reminder to log spending'}
-              </Text>
-            </View>
+            <TouchableOpacity
+              style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}
+              onPress={() => {
+                try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
+                setReminderModalVisible(true);
+              }}
+              activeOpacity={0.75}
+            >
+              <View style={[styles.prefIconBox, { backgroundColor: 'rgba(245, 158, 11, 0.15)' }]}>
+                <Ionicons name="notifications" size={16} color="#D97706" />
+              </View>
+              <View style={styles.prefTextCol}>
+                <Text style={[styles.prefTitle, { color: theme.textPrimary }]}>
+                  {language === 'bn' ? 'দৈনিক খরচের রিমাইন্ডার' : 'Daily Spending Reminder'}
+                </Text>
+                <Text style={[styles.prefSub, { color: theme.textSecondary }]}>
+                  {dailyReminderEnabled
+                    ? language === 'bn'
+                      ? `প্রতিদিন ${formatReminderTime(reminderHour, reminderMinute)} • সময় বদলাতে ট্যাপ করুন`
+                      : `Daily at ${formatReminderTime(reminderHour, reminderMinute)} • Tap to set time`
+                    : language === 'bn'
+                    ? 'বন্ধ আছে • সময় সেট করতে ট্যাপ করুন'
+                    : 'Paused • Tap to configure time'}
+                </Text>
+              </View>
+            </TouchableOpacity>
             <Switch
               value={dailyReminderEnabled}
               onValueChange={async (val) => {
-                setDailyReminderEnabled(val);
                 if (val) {
-                  await scheduleDailySpendingReminder(language);
+                  const ok = await scheduleDailySpendingReminder(language, reminderHour, reminderMinute);
+                  if (!ok && Platform.OS !== 'web') {
+                    Alert.alert(
+                      language === 'bn' ? 'অনুমতি প্রয়োজন' : 'Permission Required',
+                      language === 'bn'
+                        ? 'দৈনিক রিমাইন্ডার পেতে ফোনের Settings থেকে Pockit-এর Notification অনুমতি চালু করুন।'
+                        : 'Please allow Notifications for Pockit in your phone settings to receive daily reminders.'
+                    );
+                    setDailyReminderEnabled(false);
+                    await saveDailyReminderSettings({ enabled: false, hour: reminderHour, minute: reminderMinute });
+                    return;
+                  }
+                  setDailyReminderEnabled(true);
+                  await saveDailyReminderSettings({ enabled: true, hour: reminderHour, minute: reminderMinute });
                 } else {
-                  await Notifications.cancelAllScheduledNotificationsAsync();
+                  setDailyReminderEnabled(false);
+                  await saveDailyReminderSettings({ enabled: false, hour: reminderHour, minute: reminderMinute });
+                  await cancelDailySpendingReminder();
                 }
               }}
               trackColor={{ false: theme.border, true: theme.primary }}
@@ -2141,6 +2191,193 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         language={language}
         onClose={() => setMonthlyReportVisible(false)}
       />
+
+      {/* DAILY REMINDER TIME PICKER MODAL */}
+      <Modal
+        visible={reminderModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setReminderModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View
+            style={{
+              backgroundColor: theme.surface,
+              borderColor: theme.border,
+              borderWidth: 1,
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+              paddingHorizontal: 20,
+              paddingTop: 20,
+              paddingBottom: Math.max(insets.bottom, 24),
+            }}
+          >
+            <View style={styles.modalHeaderRow}>
+              <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>
+                {language === 'bn' ? 'রিমাইন্ডারের সময় নির্ধারণ করুন' : 'Set Daily Reminder Time'}
+              </Text>
+              <TouchableOpacity onPress={() => setReminderModalVisible(false)}>
+                <Ionicons name="close" size={22} color={theme.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={{ color: theme.textSecondary, fontSize: 13, marginBottom: 14 }}>
+              {language === 'bn'
+                ? 'আপনার সুবিধামতো একটি সময় বেছে নিন। প্রতিদিন ওই সময়ে খরচ লগ করার নোটিফিকেশন যাবে।'
+                : 'Choose when you want Pockit to remind you daily to log your expenses.'}
+            </Text>
+
+            {/* Quick Presets */}
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 18 }}>
+              {[
+                { label: '8:00 PM', h: 20, m: 0 },
+                { label: '9:00 PM', h: 21, m: 0 },
+                { label: '9:30 PM', h: 21, m: 30 },
+                { label: '10:30 PM', h: 22, m: 30 },
+              ].map((p) => {
+                const active = reminderHour === p.h && reminderMinute === p.m;
+                return (
+                  <TouchableOpacity
+                    key={p.label}
+                    onPress={() => {
+                      setReminderHour(p.h);
+                      setReminderMinute(p.m);
+                    }}
+                    style={{
+                      paddingHorizontal: 12,
+                      paddingVertical: 7,
+                      borderRadius: 10,
+                      borderWidth: 1,
+                      borderColor: active ? theme.primary : theme.border,
+                      backgroundColor: active ? 'rgba(244, 123, 78, 0.14)' : 'transparent',
+                    }}
+                  >
+                    <Text style={{ fontSize: 12.5, fontWeight: '700', color: active ? theme.primary : theme.textSecondary }}>
+                      {p.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Custom Hour & Minute Steppers */}
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 18,
+                paddingVertical: 14,
+                borderRadius: 16,
+                borderWidth: 1,
+                borderColor: theme.border,
+                backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : '#F8FAFC',
+                marginBottom: 16,
+              }}
+            >
+              <View style={{ alignItems: 'center', gap: 6 }}>
+                <TouchableOpacity onPress={() => setReminderHour((h) => (h + 1) % 24)} style={{ padding: 6 }}>
+                  <Ionicons name="chevron-up" size={20} color={theme.primary} />
+                </TouchableOpacity>
+                <Text style={{ fontSize: 24, fontWeight: '800', color: theme.textPrimary }}>
+                  {String(reminderHour % 12 === 0 ? 12 : reminderHour % 12).padStart(2, '0')}
+                </Text>
+                <TouchableOpacity onPress={() => setReminderHour((h) => (h + 23) % 24)} style={{ padding: 6 }}>
+                  <Ionicons name="chevron-down" size={20} color={theme.primary} />
+                </TouchableOpacity>
+              </View>
+
+              <Text style={{ fontSize: 24, fontWeight: '800', color: theme.textMuted }}>:</Text>
+
+              <View style={{ alignItems: 'center', gap: 6 }}>
+                <TouchableOpacity onPress={() => setReminderMinute((m) => (m + 5) % 60)} style={{ padding: 6 }}>
+                  <Ionicons name="chevron-up" size={20} color={theme.primary} />
+                </TouchableOpacity>
+                <Text style={{ fontSize: 24, fontWeight: '800', color: theme.textPrimary }}>
+                  {String(reminderMinute).padStart(2, '0')}
+                </Text>
+                <TouchableOpacity onPress={() => setReminderMinute((m) => (m + 55) % 60)} style={{ padding: 6 }}>
+                  <Ionicons name="chevron-down" size={20} color={theme.primary} />
+                </TouchableOpacity>
+              </View>
+
+              <TouchableOpacity
+                onPress={() => setReminderHour((h) => (h + 12) % 24)}
+                style={{
+                  paddingHorizontal: 12,
+                  paddingVertical: 8,
+                  borderRadius: 10,
+                  borderWidth: 1,
+                  borderColor: theme.border,
+                  backgroundColor: theme.surface,
+                }}
+              >
+                <Text style={{ fontSize: 14, fontWeight: '800', color: theme.primary }}>
+                  {reminderHour >= 12 ? 'PM' : 'AM'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <TouchableOpacity
+                onPress={async () => {
+                  const ok = await sendTestReminderNotification(language);
+                  if (!ok) {
+                    Alert.alert(
+                      language === 'bn' ? 'অনুমতি প্রয়োজন' : 'Permission Required',
+                      language === 'bn'
+                        ? 'নোটিফিকেশন টেস্ট করতে Settings থেকে অনুমতি দিন।'
+                        : 'Please enable notifications in your phone settings to test.'
+                    );
+                  }
+                }}
+                style={{
+                  flex: 1,
+                  paddingVertical: 13,
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: theme.border,
+                  alignItems: 'center',
+                }}
+              >
+                <Text style={{ fontSize: 13.5, fontWeight: '700', color: theme.textSecondary }}>
+                  {language === 'bn' ? 'টেস্ট করুন' : 'Send Test'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={async () => {
+                  const ok = await scheduleDailySpendingReminder(language, reminderHour, reminderMinute);
+                  if (!ok && Platform.OS !== 'web') {
+                    Alert.alert(
+                      language === 'bn' ? 'অনুমতি প্রয়োজন' : 'Permission Required',
+                      language === 'bn'
+                        ? 'নোটিফিকেশন চালু করতে ফোনের Settings থেকে অনুমতি দিন।'
+                        : 'Please allow Notifications in your phone settings.'
+                    );
+                    return;
+                  }
+                  setDailyReminderEnabled(true);
+                  await saveDailyReminderSettings({ enabled: true, hour: reminderHour, minute: reminderMinute });
+                  setReminderModalVisible(false);
+                  try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
+                }}
+                style={{
+                  flex: 1.4,
+                  paddingVertical: 13,
+                  borderRadius: 12,
+                  backgroundColor: theme.primary,
+                  alignItems: 'center',
+                }}
+              >
+                <Text style={{ fontSize: 13.5, fontWeight: '700', color: '#FFFFFF' }}>
+                  {language === 'bn' ? 'সেভ ও চালু করুন' : 'Save & Enable'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Interactive Feature Walkthrough Guide Modal */}
       <FeatureWalkthroughModal
