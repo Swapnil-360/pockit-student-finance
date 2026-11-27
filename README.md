@@ -1,6 +1,8 @@
 # Pockit — Student Money & Financial Risk Coach
 ### মাসের শেষে পকেট খালি হওয়ার আগেই সতর্ক হোন! | Get warned before your pocket runs empty!
 
+> **Keywords:** `Pockit` · `Student Expense Tracker Bangladesh` · `Mess Meal Calculator` · `bKash / Nagad Budget App` · `AI Financial Risk Coach` · `Bilingual (EN / বাংলা)`
+
 [![Latest Release](https://img.shields.io/github/v/release/Swapnil-360/pockit-student-finance?label=Download%20APK&color=10B981&style=for-the-badge)](https://github.com/Swapnil-360/pockit-student-finance/releases/latest)
 [![Platform](https://img.shields.io/badge/Platform-Android%20%7C%20Web-0EA5E9?style=for-the-badge)](https://github.com/Swapnil-360/pockit-student-finance/releases/latest)
 [![Backend](https://img.shields.io/badge/Backend-FastAPI%20%2B%20Gemini%20AI-F59E0B?style=for-the-badge)](https://pockit-backend-eppq.onrender.com/docs)

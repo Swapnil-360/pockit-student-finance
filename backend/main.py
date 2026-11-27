@@ -124,8 +124,8 @@ app.include_router(admin_router)
 
 
 # --- 1. SYSTEM HEALTH & METADATA ---
-@app.get("/")
-def read_root():
+@app.get("/api")
+def read_api_root():
     return {
         "system": "Student Financial Management & Risk Warning System (শিক্ষার্থীর অর্থ ব্যবস্থাপনা)",
         "version": "2.1.0",
@@ -1494,6 +1494,120 @@ def privacy_policy_page():
 @app.get("/delete-account", response_class=HTMLResponse)
 def delete_account_info_page():
     return HTMLResponse(content=_PRIVACY_HTML)
+
+
+_LANDING_HTML = """<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pockit — Student Money, Mess Meal &amp; Financial Risk Coach (Bangladesh)</title>
+  <meta name="description" content="Pockit is a free bilingual (English &amp; Bangla) student expense tracker, mess meal refund calculator, dream goal vault, and AI financial risk coach built for university students in Bangladesh." />
+  <meta name="keywords" content="Pockit, Pockit app, student expense tracker Bangladesh, mess meal calculator, bKash Nagad budget app, university student finance, TakaTrack, AI financial coach" />
+  <meta name="robots" content="index, follow" />
+  <link rel="canonical" href="https://pockit-backend-eppq.onrender.com/" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Pockit — Student Money &amp; Financial Risk Coach" />
+  <meta property="og:description" content="Get warned before your pocket runs empty! Track daily expenses, mess meals, bKash/Nagad inflows, and savings goals with AI coaching." />
+  <meta property="og:url" content="https://pockit-backend-eppq.onrender.com/" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Pockit — Student Money &amp; Financial Risk Coach" />
+  <meta name="twitter:description" content="Free bilingual student expense tracker, mess meal calculator &amp; AI financial coach for Bangladesh." />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Pockit — Student Money & Risk Coach",
+    "operatingSystem": "Android, Web",
+    "applicationCategory": "FinanceApplication",
+    "inLanguage": ["en", "bn"],
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "BDT"
+    },
+    "downloadUrl": "https://github.com/Swapnil-360/pockit-student-finance/releases/latest",
+    "author": {
+      "@type": "Person",
+      "name": "Md. Miftahur Rahman Swapnil",
+      "url": "https://mrswapnil.me"
+    },
+    "description": "Bilingual student expense tracker, mess meal refund assistant, and ML-powered financial risk coach for university students in Bangladesh."
+  }
+  </script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0B1218; color: #F8FAFC; margin: 0; padding: 36px 16px; line-height: 1.65; }
+    .wrap { max-width: 820px; margin: 0 auto; }
+    .card { background: #121A22; border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; padding: 32px; }
+    .badge { display: inline-block; background: rgba(244,123,78,0.16); color: #F47B4E; font-weight: 700; font-size: 12px; padding: 5px 12px; border-radius: 999px; }
+    h1 { font-size: 32px; margin: 14px 0 8px; line-height: 1.2; }
+    .sub { color: #94A3B8; font-size: 16px; margin-bottom: 24px; }
+    .cta-row { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 28px; }
+    .btn { display: inline-block; padding: 12px 22px; border-radius: 12px; font-weight: 700; text-decoration: none; font-size: 14px; }
+    .btn-primary { background: #10B981; color: #052E16; }
+    .btn-secondary { background: rgba(255,255,255,0.06); color: #F8FAFC; border: 1px solid rgba(255,255,255,0.12); }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+    .feat { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; padding: 16px; }
+    .feat h2 { font-size: 15px; margin: 0 0 6px; color: #F47B4E; }
+    .feat p { font-size: 13.5px; color: #CBD5E1; margin: 0; }
+    footer { margin-top: 24px; font-size: 12.5px; color: #64748B; text-align: center; }
+    footer a { color: #94A3B8; }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <section class="card">
+      <span class="badge">Pockit · Student Financial Intelligence</span>
+      <h1>Spend smarter. Live easier.</h1>
+      <p class="sub">Bilingual (English &amp; বাংলা) student expense tracker, mess meal refund calculator, Dream Goal vault, and AI financial risk coach for university students in Bangladesh.</p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="https://github.com/Swapnil-360/pockit-student-finance/releases/latest">Download Android APK (Free)</a>
+        <a class="btn btn-secondary" href="https://github.com/Swapnil-360/pockit-student-finance">View on GitHub</a>
+      </div>
+      <div class="grid">
+        <div class="feat">
+          <h2>Safe Daily Spending Limit</h2>
+          <p>Ring-fences fixed rent and mess meal advance so you always know what is safe to spend today.</p>
+        </div>
+        <div class="feat">
+          <h2>Mess Meal &amp; Refund Tracker</h2>
+          <p>Log daily meals with custom rates and automatic daily carry-forward to track surplus or deficit.</p>
+        </div>
+        <div class="feat">
+          <h2>ML Risk &amp; Gemini AI Coach</h2>
+          <p>22-feature ML risk forecasting with "Ask AI Before I Buy" simulation and daily coaching.</p>
+        </div>
+      </div>
+    </section>
+    <footer>
+      Built by <a href="https://mrswapnil.me">Md. Miftahur Rahman Swapnil</a> ·
+      <a href="/privacy">Privacy Policy</a> ·
+      <a href="mailto:miftahurr503@gmail.com">miftahurr503@gmail.com</a>
+    </footer>
+  </main>
+</body>
+</html>"""
+
+
+@app.get("/", response_class=HTMLResponse)
+def landing_page():
+    return HTMLResponse(content=_LANDING_HTML)
+
+
+@app.get("/robots.txt", response_class=HTMLResponse)
+def robots_txt():
+    content = "User-agent: *\nAllow: /\nAllow: /privacy\nDisallow: /api/\nDisallow: /admin/\nSitemap: https://pockit-backend-eppq.onrender.com/sitemap.xml\n"
+    return HTMLResponse(content=content, media_type="text/plain")
+
+
+@app.get("/sitemap.xml", response_class=HTMLResponse)
+def sitemap_xml():
+    xml = """<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://pockit-backend-eppq.onrender.com/</loc><priority>1.0</priority></url>
+  <url><loc>https://pockit-backend-eppq.onrender.com/privacy</loc><priority>0.5</priority></url>
+</urlset>"""
+    return HTMLResponse(content=xml, media_type="application/xml")
 
 
 _admin_dist = Path(__file__).resolve().parent.parent / "admin-panel" / "dist"
