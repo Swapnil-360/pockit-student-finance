@@ -4,16 +4,16 @@ import Constants from 'expo-constants';
 import { saveAuthToken, clearAuthToken } from './security';
 
 const getInitialBaseUrl = (): string => {
-  // 1. Local browser dev server -> always talk to local FastAPI backend on port 8000
+  // 1. Explicit public env variable configured during EAS build or in .env
+  if (process.env.EXPO_PUBLIC_API_URL) {
+    return process.env.EXPO_PUBLIC_API_URL.replace(/\/+$/, '');
+  }
+
+  // 2. Local browser dev server fallback -> talk to local FastAPI backend on port 8000
   if (typeof window !== 'undefined' && window.location?.hostname) {
     if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
       return `http://${window.location.hostname}:8000`;
     }
-  }
-
-  // 2. Explicit public env variable configured during EAS build or in .env
-  if (process.env.EXPO_PUBLIC_API_URL) {
-    return process.env.EXPO_PUBLIC_API_URL.replace(/\/+$/, '');
   }
 
   // 2. Extra configuration from app.json / app.config.js
