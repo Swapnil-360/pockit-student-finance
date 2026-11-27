@@ -1637,6 +1637,11 @@ def sitemap_xml():
     return HTMLResponse(content=xml, media_type="application/xml")
 
 
+@app.get("/google75bd03afcad13aba.html", response_class=HTMLResponse)
+def google_site_verification():
+    return HTMLResponse(content="google-site-verification: google75bd03afcad13aba.html", media_type="text/html")
+
+
 _admin_dist = Path(__file__).resolve().parent.parent / "admin-panel" / "dist"
 if _admin_dist.exists():
     app.mount("/admin", StaticFiles(directory=str(_admin_dist), html=True), name="admin-panel")
