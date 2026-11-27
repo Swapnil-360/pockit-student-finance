@@ -34,6 +34,7 @@ import { DisciplineTracker } from '../components/DisciplineTracker';
 import { CompactRiskGauge } from '../components/CompactRiskGauge';
 import { MessMealTrackerModal } from '../components/MessMealTrackerModal';
 import { sendHighRiskAlertNotification, sendAnnouncementLocalNotification } from '../services/notifications';
+import { AppUpdateInfo, checkForGitHubUpdate, shouldNotifyForVersion } from '../services/appUpdater';
 import { getRandomQuote, getNextQuote, MotivationalQuote } from '../constants/quotes';
 import { getCallingName } from '../utils/nameHelper';
 import { getGoalIconName } from '../constants/goalIcons';
@@ -88,6 +89,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [notificationsVisible, setNotificationsVisible] = useState(false);
   const [announcements, setAnnouncements] = useState<AppAnnouncement[]>([]);
   const [readAnnouncementIds, setReadAnnouncementIds] = useState<string[]>([]);
+  const [appUpdateInfo, setAppUpdateInfo] = useState<AppUpdateInfo | null>(null);
   const [loadingAnnouncements, setLoadingAnnouncements] = useState(false);
   const [streakModalVisible, setStreakModalVisible] = useState(false);
 
@@ -171,16 +173,32 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     const loadNotices = async () => {
       setLoadingAnnouncements(true);
       try {
-        const [items, readRaw, notifiedRaw] = await Promise.all([
+        const [items, readRaw, notifiedRaw, ghUpdate] = await Promise.all([
           fetchAnnouncements(),
           AsyncStorage.getItem('@pockit_read_announcement_ids'),
           AsyncStorage.getItem('@pockit_notified_announcement_ids'),
+          checkForGitHubUpdate(),
         ]);
         if (!active) return;
         const readIds: string[] = readRaw ? JSON.parse(readRaw) : [];
         const notifiedIds: string[] = notifiedRaw ? JSON.parse(notifiedRaw) : [];
         setAnnouncements(items);
         setReadAnnouncementIds(readIds);
+        setAppUpdateInfo(ghUpdate);
+
+        if (ghUpdate.hasUpdate) {
+          const shouldNotify = await shouldNotifyForVersion(ghUpdate.latestVersion);
+          if (shouldNotify) {
+            sendAnnouncementLocalNotification(
+              language === 'bn'
+                ? `নতুন ভার্সন উপলব্ধ (v${ghUpdate.latestVersion})`
+                : `Pockit v${ghUpdate.latestVersion} Available!`,
+              language === 'bn'
+                ? 'নতুন ফিচার ও বাগ ফিক্স পেতে নোটিফিকেশন খুলে আপডেট ডাউনলোড করুন।'
+                : 'A new version of Pockit is ready on GitHub. Open Notifications to download.'
+            ).catch(() => {});
+          }
+        }
 
         // Fire a local OS notification for the newest unseen announcement once
         const newestUnnotified = items.find((a) => !notifiedIds.includes(a.id) && !readIds.includes(a.id));
@@ -204,6 +222,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     () => announcements.filter((a) => !readAnnouncementIds.includes(a.id)).map((a) => a.id),
     [announcements, readAnnouncementIds]
   );
+
+  const totalBellBadgeCount = unreadAnnouncementIds.length + (appUpdateInfo?.hasUpdate ? 1 : 0);
 
   const handleOpenNotifications = async () => {
     try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
@@ -378,14 +398,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               accessibilityLabel="Notifications and Announcements"
             >
               <Ionicons
-                name={unreadAnnouncementIds.length > 0 ? 'notifications' : 'notifications-outline'}
+                name={totalBellBadgeCount > 0 ? 'notifications' : 'notifications-outline'}
                 size={20}
                 color="#EA580C"
               />
-              {unreadAnnouncementIds.length > 0 && (
+              {totalBellBadgeCount > 0 && (
                 <View style={styles.bellBadge}>
                   <Text style={styles.bellBadgeText}>
-                    {unreadAnnouncementIds.length > 9 ? '9+' : unreadAnnouncementIds.length}
+                    {totalBellBadgeCount > 9 ? '9+' : totalBellBadgeCount}
                   </Text>
                 </View>
               )}
@@ -881,6 +901,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         onClose={handleCloseNotifications}
         announcements={announcements}
         unreadIds={unreadAnnouncementIds}
+        updateInfo={appUpdateInfo}
         loading={loadingAnnouncements}
         language={language}
         onOpenAppGuide={() => setWalkthroughVisible(true)}

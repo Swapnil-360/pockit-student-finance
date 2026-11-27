@@ -45,6 +45,14 @@ import {
   saveDailyReminderSettings,
   sendTestReminderNotification,
 } from '../services/notifications';
+import {
+  AppUpdateInfo,
+  checkForGitHubUpdate,
+  checkForOtaUpdate,
+  applyOtaUpdate,
+  openApkDownload,
+  getCurrentAppVersion,
+} from '../services/appUpdater';
 import { supabase } from '../services/supabaseClient';
 import { getCallingName, suggestCallingNames } from '../utils/nameHelper';
 
@@ -117,6 +125,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   const [reminderMinute, setReminderMinute] = useState(30);
   const [reminderModalVisible, setReminderModalVisible] = useState(false);
   const [walkthroughVisible, setWalkthroughVisible] = useState(false);
+  const [updateModalVisible, setUpdateModalVisible] = useState(false);
+  const [checkingUpdates, setCheckingUpdates] = useState(false);
+  const [updateResult, setUpdateResult] = useState<AppUpdateInfo | null>(null);
+  const [otaAvailable, setOtaAvailable] = useState(false);
+  const [applyingOta, setApplyingOta] = useState(false);
 
   // Account Management State
   const [deletingAccount, setDeletingAccount] = useState(false);
@@ -151,6 +164,22 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     const hour12 = h % 12 === 0 ? 12 : h % 12;
     const minStr = m < 10 ? `0${m}` : `${m}`;
     return `${hour12}:${minStr} ${period}`;
+  };
+
+  const handleCheckForUpdates = async () => {
+    try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
+    setUpdateModalVisible(true);
+    setCheckingUpdates(true);
+    try {
+      const [gh, hasOta] = await Promise.all([
+        checkForGitHubUpdate(),
+        checkForOtaUpdate(),
+      ]);
+      setUpdateResult(gh);
+      setOtaAvailable(hasOta);
+    } finally {
+      setCheckingUpdates(false);
+    }
   };
 
   useEffect(() => {
@@ -879,6 +908,30 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
               </Text>
               <Text style={[styles.prefSub, { color: theme.textSecondary }]}>
                 {language === 'bn' ? '৫-কার্ড ইন্টারঅ্যাক্টিভ ওয়াকথ্রু দেখুন' : 'Explore interactive 5-card walkthrough'}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
+          </TouchableOpacity>
+
+          <View style={[styles.prefDivider, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.06)' : theme.borderSubtle }]} />
+
+          {/* Row 5: Check for Updates */}
+          <TouchableOpacity
+            style={styles.preferenceRow}
+            onPress={handleCheckForUpdates}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.prefIconBox, { backgroundColor: 'rgba(16, 185, 129, 0.14)' }]}>
+              <Ionicons name="cloud-download-outline" size={16} color="#10B981" />
+            </View>
+            <View style={styles.prefTextCol}>
+              <Text style={[styles.prefTitle, { color: theme.textPrimary }]}>
+                {language === 'bn' ? 'অ্যাপ আপডেট চেক করুন' : 'Check for Updates'}
+              </Text>
+              <Text style={[styles.prefSub, { color: theme.textSecondary }]}>
+                {language === 'bn'
+                  ? `বর্তমান ভার্সন v${getCurrentAppVersion()} • নতুন আপডেট দেখুন`
+                  : `Current version v${getCurrentAppVersion()} • GitHub & OTA`}
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
@@ -2375,6 +2428,157 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 </Text>
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* CHECK FOR UPDATES MODAL */}
+      <Modal
+        visible={updateModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setUpdateModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View
+            style={{
+              backgroundColor: theme.surface,
+              borderColor: theme.border,
+              borderWidth: 1,
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+              paddingHorizontal: 20,
+              paddingTop: 20,
+              paddingBottom: Math.max(insets.bottom, 24),
+            }}
+          >
+            <View style={styles.modalHeaderRow}>
+              <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>
+                {language === 'bn' ? 'অ্যাপ আপডেট' : 'App Updates'}
+              </Text>
+              <TouchableOpacity onPress={() => setUpdateModalVisible(false)}>
+                <Ionicons name="close" size={22} color={theme.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            {checkingUpdates ? (
+              <View style={{ alignItems: 'center', paddingVertical: 28, gap: 10 }}>
+                <ActivityIndicator size="large" color={theme.primary} />
+                <Text style={{ color: theme.textSecondary, fontSize: 13 }}>
+                  {language === 'bn' ? 'GitHub থেকে নতুন ভার্সন চেক করা হচ্ছে...' : 'Checking GitHub Releases for updates...'}
+                </Text>
+              </View>
+            ) : updateResult?.hasUpdate ? (
+              <View style={{ gap: 12 }}>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 10,
+                    padding: 12,
+                    borderRadius: 14,
+                    backgroundColor: isDark ? 'rgba(16, 185, 129, 0.14)' : '#ECFDF5',
+                    borderWidth: 1,
+                    borderColor: 'rgba(16, 185, 129, 0.35)',
+                  }}
+                >
+                  <Ionicons name="rocket-outline" size={22} color="#10B981" />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 14.5, fontWeight: '700', color: theme.textPrimary }}>
+                      {language === 'bn'
+                        ? `নতুন ভার্সন v${updateResult.latestVersion} উপলব্ধ!`
+                        : `New Version v${updateResult.latestVersion} Available!`}
+                    </Text>
+                    <Text style={{ fontSize: 12, color: theme.textSecondary }}>
+                      {`Installed: v${updateResult.currentVersion} → Latest: v${updateResult.latestVersion}`}
+                    </Text>
+                  </View>
+                </View>
+
+                {!!updateResult.releaseNotes && (
+                  <ScrollView
+                    style={{
+                      maxHeight: 150,
+                      padding: 12,
+                      borderRadius: 12,
+                      backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#F8FAFC',
+                      borderWidth: 1,
+                      borderColor: theme.border,
+                    }}
+                  >
+                    <Text style={{ fontSize: 12.5, color: theme.textSecondary, lineHeight: 18 }}>
+                      {updateResult.releaseNotes}
+                    </Text>
+                  </ScrollView>
+                )}
+
+                <TouchableOpacity
+                  onPress={() => openApkDownload(updateResult.downloadUrl)}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                    backgroundColor: '#10B981',
+                    paddingVertical: 14,
+                    borderRadius: 12,
+                  }}
+                >
+                  <Ionicons name="cloud-download-outline" size={18} color="#FFFFFF" />
+                  <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '700' }}>
+                    {language === 'bn' ? 'আপডেট ও APK ডাউনলোড করুন' : 'Update & Download APK'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={{ alignItems: 'center', paddingVertical: 18, gap: 10 }}>
+                <View
+                  style={{
+                    width: 52,
+                    height: 52,
+                    borderRadius: 26,
+                    backgroundColor: 'rgba(16, 185, 129, 0.14)',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Ionicons name="checkmark-circle" size={30} color="#10B981" />
+                </View>
+                <Text style={{ fontSize: 16, fontWeight: '700', color: theme.textPrimary }}>
+                  {language === 'bn' ? 'আপনার অ্যাপ আপ-টু-ডেট আছে!' : "You're up to date!"}
+                </Text>
+                <Text style={{ fontSize: 13, color: theme.textSecondary, textAlign: 'center' }}>
+                  {language === 'bn'
+                    ? `আপনি Pockit-এর সর্বশেষ ভার্সন (v${updateResult?.currentVersion || getCurrentAppVersion()}) ব্যবহার করছেন।`
+                    : `You are running the latest version of Pockit (v${updateResult?.currentVersion || getCurrentAppVersion()}).`}
+                </Text>
+
+                {otaAvailable && (
+                  <TouchableOpacity
+                    disabled={applyingOta}
+                    onPress={async () => {
+                      setApplyingOta(true);
+                      await applyOtaUpdate();
+                      setApplyingOta(false);
+                    }}
+                    style={{
+                      marginTop: 6,
+                      width: '100%',
+                      paddingVertical: 13,
+                      borderRadius: 12,
+                      backgroundColor: theme.primary,
+                      alignItems: 'center',
+                    }}
+                  >
+                    <Text style={{ color: '#FFFFFF', fontSize: 13.5, fontWeight: '700' }}>
+                      {applyingOta
+                        ? language === 'bn' ? 'আপডেট প্রয়োগ হচ্ছে...' : 'Applying Patch...'
+                        : language === 'bn' ? 'ইনস্ট্যান্ট প্যাচ প্রয়োগ ও রিস্টার্ট করুন' : 'Apply Instant Patch & Restart'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
           </View>
         </View>
       </Modal>

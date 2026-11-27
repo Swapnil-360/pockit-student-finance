@@ -12,12 +12,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../constants/ThemeContext';
 import { AppAnnouncement } from '../services/api';
+import { AppUpdateInfo, openApkDownload } from '../services/appUpdater';
 
 interface NotificationsModalProps {
   visible: boolean;
   onClose: () => void;
   announcements: AppAnnouncement[];
   unreadIds: string[];
+  updateInfo?: AppUpdateInfo | null;
   loading?: boolean;
   language: 'en' | 'bn';
   onOpenAppGuide?: () => void;
@@ -28,6 +30,7 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
   onClose,
   announcements,
   unreadIds,
+  updateInfo,
   loading = false,
   language,
   onOpenAppGuide,
@@ -84,11 +87,59 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
           </View>
 
           <ScrollView style={styles.list} showsVerticalScrollIndicator={false}>
-            {loading && announcements.length === 0 ? (
+            {updateInfo?.hasUpdate && (
+              <View
+                style={[
+                  styles.card,
+                  {
+                    backgroundColor: isDark ? 'rgba(16, 185, 129, 0.12)' : '#ECFDF5',
+                    borderColor: 'rgba(16, 185, 129, 0.45)',
+                  },
+                ]}
+              >
+                <View style={styles.cardTop}>
+                  <View style={styles.cardTitleWrap}>
+                    <Ionicons name="rocket-outline" size={16} color="#10B981" />
+                    <Text style={[styles.cardTitle, { color: theme.textPrimary }]}>
+                      {isBn
+                        ? `নতুন ভার্সন উপলব্ধ (v${updateInfo.latestVersion})`
+                        : `New Version Available (v${updateInfo.latestVersion})`}
+                    </Text>
+                  </View>
+                  <Text style={[styles.cardDate, { color: '#10B981', fontWeight: '700' }]}>
+                    {`v${updateInfo.currentVersion} → v${updateInfo.latestVersion}`}
+                  </Text>
+                </View>
+                <Text style={[styles.cardMsg, { color: theme.textSecondary, marginBottom: 10 }]}>
+                  {isBn
+                    ? 'নতুন ফিচার ও বাগ ফিক্স পেতে এখনই নতুন APK আপডেট ডাউনলোড করুন।'
+                    : 'A newer version of Pockit is ready on GitHub. Download the latest APK to update.'}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => openApkDownload(updateInfo.downloadUrl)}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 6,
+                    backgroundColor: '#10B981',
+                    paddingVertical: 9,
+                    borderRadius: 10,
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="cloud-download-outline" size={16} color="#FFFFFF" />
+                  <Text style={{ color: '#FFFFFF', fontSize: 12.5, fontWeight: '700' }}>
+                    {isBn ? 'আপডেট ও ডাউনলোড করুন' : 'Update & Download APK'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+            {loading && announcements.length === 0 && !updateInfo?.hasUpdate ? (
               <View style={styles.emptyBox}>
                 <ActivityIndicator color={theme.primary} />
               </View>
-            ) : announcements.length === 0 ? (
+            ) : announcements.length === 0 && !updateInfo?.hasUpdate ? (
               <View style={[styles.emptyBox, { backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : '#F8FAFC', borderColor: theme.border }]}>
                 <Ionicons name="notifications-off-outline" size={30} color={theme.textMuted} />
                 <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>
@@ -291,3 +342,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
+
