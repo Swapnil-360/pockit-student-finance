@@ -1501,23 +1501,24 @@ _LANDING_HTML = """<!DOCTYPE html>
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Pockit — Student Money, Mess Meal &amp; Financial Risk Coach (Bangladesh)</title>
-  <meta name="description" content="Pockit is a free bilingual (English &amp; Bangla) student expense tracker, mess meal refund calculator, dream goal vault, and AI financial risk coach built for university students in Bangladesh." />
-  <meta name="keywords" content="Pockit, Pockit app, student expense tracker Bangladesh, mess meal calculator, bKash Nagad budget app, university student finance, TakaTrack, AI financial coach" />
+  <title>Pockit — Student Money, Khoroch Track &amp; Mess Meal App (Bangladesh)</title>
+  <meta name="description" content="Pockit is a free bilingual (English &amp; বাংলা) student expense tracker (খরচের হিসাব / khoroch track), mess meal calculator (মেস মিল হিসাব), bKash/Nagad budget planner, and AI financial risk coach for Bangladesh." />
+  <meta name="keywords" content="Pockit, Pockit app, Pockit APK download, student expense tracker Bangladesh, financial management app, money manager, budget app BD, mess meal calculator, bKash Nagad tracker, khoroch track app, taka hisab app, mess meal hisab, masher khoroch, poket khoroch, taka track, ছাত্রদের বাজেট অ্যাপ, খরচ ট্র্যাকার, টাকা হিসাব অ্যাপ, মেস মিল হিসাব, প্রতিদিনের খরচ" />
   <meta name="robots" content="index, follow" />
   <link rel="canonical" href="https://pockit-backend-eppq.onrender.com/" />
   <meta property="og:type" content="website" />
-  <meta property="og:title" content="Pockit — Student Money &amp; Financial Risk Coach" />
-  <meta property="og:description" content="Get warned before your pocket runs empty! Track daily expenses, mess meals, bKash/Nagad inflows, and savings goals with AI coaching." />
+  <meta property="og:title" content="Pockit — Student Money, Khoroch Track &amp; Mess Meal Coach" />
+  <meta property="og:description" content="Free Android APK! Track daily khoroch (খরচ), mess meals, bKash/Nagad inflows, and savings goals with AI risk coaching." />
   <meta property="og:url" content="https://pockit-backend-eppq.onrender.com/" />
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="Pockit — Student Money &amp; Financial Risk Coach" />
-  <meta name="twitter:description" content="Free bilingual student expense tracker, mess meal calculator &amp; AI financial coach for Bangladesh." />
+  <meta name="twitter:title" content="Pockit — Student Money &amp; Khoroch Track App" />
+  <meta name="twitter:description" content="Free bilingual (EN/BN) student expense tracker, mess meal calculator &amp; AI financial coach for Bangladesh." />
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
     "name": "Pockit — Student Money & Risk Coach",
+    "alternateName": ["Pockit App", "TakaTrack AI", "Khoroch Track BD"],
     "operatingSystem": "Android, Web",
     "applicationCategory": "FinanceApplication",
     "inLanguage": ["en", "bn"],
@@ -1527,12 +1528,37 @@ _LANDING_HTML = """<!DOCTYPE html>
       "priceCurrency": "BDT"
     },
     "downloadUrl": "https://github.com/Swapnil-360/pockit-student-finance/releases/latest",
+    "installUrl": "https://github.com/Swapnil-360/pockit-student-finance/releases/latest",
     "author": {
       "@type": "Person",
       "name": "Md. Miftahur Rahman Swapnil",
       "url": "https://mrswapnil.me"
     },
-    "description": "Bilingual student expense tracker, mess meal refund assistant, and ML-powered financial risk coach for university students in Bangladesh."
+    "description": "Free bilingual (English & Bangla) student financial management, daily khoroch tracker, mess meal refund calculator, and ML risk coach for Bangladesh."
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "How do I download Pockit Android APK for free?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Click the Download Android APK button on this page or visit the official GitHub Releases page (github.com/Swapnil-360/pockit-student-finance/releases/latest) to download the latest APK for free."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Does Pockit support Bangla, mess meal calculation, and bKash/Nagad tracking?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes. Pockit is 100% bilingual (English & বাংলা) and includes a Mess Meal & Refund Tracker, bKash/Nagad/Rocket cashflow logging, Dream Goal Vault, and Gemini AI financial coaching."
+        }
+      }
+    ]
   }
   </script>
   <style>
@@ -1559,10 +1585,11 @@ _LANDING_HTML = """<!DOCTYPE html>
     <section class="card">
       <span class="badge">Pockit · Student Financial Intelligence</span>
       <h1>Spend smarter. Live easier.</h1>
-      <p class="sub">Bilingual (English &amp; বাংলা) student expense tracker, mess meal refund calculator, Dream Goal vault, and AI financial risk coach for university students in Bangladesh.</p>
+      <p class="sub">Bilingual (English &amp; বাংলা) student financial management, daily khoroch tracker (খরচের হিসাব), mess meal calculator (মেস মিল হিসাব), Dream Goal vault, and AI risk coach for Bangladesh.</p>
       <div class="cta-row">
-        <a class="btn btn-primary" href="https://github.com/Swapnil-360/pockit-student-finance/releases/latest">Download Android APK (Free)</a>
-        <a class="btn btn-secondary" href="https://github.com/Swapnil-360/pockit-student-finance">View on GitHub</a>
+        <a class="btn btn-primary" href="https://github.com/Swapnil-360/pockit-student-finance/releases/latest/download/pockit-2.0.1.apk">Direct Download APK (Free)</a>
+        <a class="btn btn-secondary" href="https://github.com/Swapnil-360/pockit-student-finance/releases/latest">All GitHub Releases</a>
+        <a class="btn btn-secondary" href="https://github.com/Swapnil-360/pockit-student-finance">Source on GitHub</a>
       </div>
       <div class="grid">
         <div class="feat">
