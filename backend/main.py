@@ -1587,7 +1587,7 @@ _LANDING_HTML = """<!DOCTYPE html>
       <h1>Spend smarter. Live easier.</h1>
       <p class="sub">Bilingual (English &amp; বাংলা) student financial management, daily khoroch tracker (খরচের হিসাব), mess meal calculator (মেস মিল হিসাব), Dream Goal vault, and AI risk coach for Bangladesh.</p>
       <div class="cta-row">
-        <a class="btn btn-primary" href="https://github.com/Swapnil-360/pockit-student-finance/releases/latest/download/pockit-2.0.1.apk">Direct Download APK (Free)</a>
+        <a class="btn btn-primary" href="https://github.com/Swapnil-360/pockit-student-finance/releases/latest/download/Pockit-2.0.2.apk">Direct Download APK (v2.0.2 Free)</a>
         <a class="btn btn-secondary" href="https://github.com/Swapnil-360/pockit-student-finance/releases/latest">All GitHub Releases</a>
         <a class="btn btn-secondary" href="https://github.com/Swapnil-360/pockit-student-finance">Source on GitHub</a>
       </div>
