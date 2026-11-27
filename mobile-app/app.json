@@ -4,7 +4,7 @@
     "slug": "pockit",
     "scheme": "pockit",
     "description": "Pockit — Student Money & Financial Risk Coach",
-    "version": "2.0.1",
+    "version": "2.0.2",
     "runtimeVersion": {
       "policy": "appVersion"
     },
@@ -27,7 +27,7 @@
     },
     "android": {
       "package": "com.pockit.app",
-      "versionCode": 1,
+      "versionCode": 4,
       "adaptiveIcon": {
         "foregroundImage": "./assets/brand/adaptive-icon.png",
         "backgroundColor": "#121417"
