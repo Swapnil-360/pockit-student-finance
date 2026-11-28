@@ -22,7 +22,6 @@ interface NotificationsModalProps {
   updateInfo?: AppUpdateInfo | null;
   loading?: boolean;
   language: 'en' | 'bn';
-  onOpenAppGuide?: () => void;
 }
 
 export const NotificationsModal: React.FC<NotificationsModalProps> = ({
@@ -33,127 +32,181 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
   updateInfo,
   loading = false,
   language,
-  onOpenAppGuide,
 }) => {
   const { isDark, theme } = useTheme();
   const insets = useSafeAreaInsets();
   const isBn = language === 'bn';
 
+  const totalUnread = unreadIds.length + (updateInfo?.hasUpdate ? 1 : 0);
+
   const formatDate = (iso: string) => {
+    if (!iso) return '';
     try {
-      const d = new Date(iso);
+      const normalized = iso.includes(' ') && !iso.includes('T') ? iso.replace(' ', 'T') : iso;
+      const d = new Date(normalized);
+      if (isNaN(d.getTime())) return iso;
       return d.toLocaleDateString(isBn ? 'bn-BD' : 'en-US', {
         month: 'short',
         day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
       });
     } catch {
       return '';
     }
   };
 
+  const getItemMeta = (item: AppAnnouncement) => {
+    const t = (item.title || '').toLowerCase();
+    if (item.id.startsWith('offer_notice_') || t.includes('giveaway') || t.includes('reward') || t.includes('pro')) {
+      return {
+        icon: 'gift-outline' as const,
+        color: '#F47B4E',
+        bg: isDark ? 'rgba(244, 123, 78, 0.16)' : '#FFF7ED',
+        tag: isBn ? 'অফার' : 'Offer',
+      };
+    }
+    if (t.includes('update') || t.includes('version') || t.includes('v2.')) {
+      return {
+        icon: 'sparkles-outline' as const,
+        color: '#38BDF8',
+        bg: isDark ? 'rgba(56, 189, 248, 0.16)' : '#F0F9FF',
+        tag: isBn ? 'আপডেট' : 'Update',
+      };
+    }
+    return {
+      icon: 'megaphone-outline' as const,
+      color: '#10B981',
+      bg: isDark ? 'rgba(16, 185, 129, 0.16)' : '#ECFDF5',
+      tag: isBn ? 'ঘোষণা' : 'Notice',
+    };
+  };
+
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.overlay}>
+        <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
         <View
           style={[
             styles.sheet,
             {
               backgroundColor: theme.surface,
               borderColor: theme.border,
-              paddingBottom: Math.max(insets.bottom, 20),
+              paddingBottom: Math.max(insets.bottom, 22),
             },
           ]}
         >
-          <View style={styles.handle} />
+          <View style={[styles.handle, { backgroundColor: isDark ? 'rgba(255,255,255,0.16)' : '#CBD5E1' }]} />
+
           <View style={styles.header}>
             <View style={styles.titleRow}>
               <View style={[styles.iconCircle, { backgroundColor: isDark ? 'rgba(244, 123, 78, 0.16)' : '#FFF7ED' }]}>
-                <Ionicons name="notifications" size={18} color="#F47B4E" />
+                <Ionicons name="notifications" size={19} color="#F47B4E" />
               </View>
               <View>
-                <Text style={[styles.title, { color: theme.textPrimary }]}>
-                  {isBn ? 'নোটিফিকেশন ও আপডেট' : 'Notifications & Updates'}
-                </Text>
+                <View style={styles.titleBadgeRow}>
+                  <Text style={[styles.title, { color: theme.textPrimary }]}>
+                    {isBn ? 'নোটিফিকেশন' : 'Notifications'}
+                  </Text>
+                  {totalUnread > 0 && (
+                    <View style={styles.newPill}>
+                      <Text style={styles.newPillText}>
+                        {isBn ? `${totalUnread} নতুন` : `${totalUnread} new`}
+                      </Text>
+                    </View>
+                  )}
+                </View>
                 <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-                  {isBn ? 'অ্যাডমিন ঘোষণা ও অ্যাপ আপডেট' : 'Admin announcements & app updates'}
+                  {isBn ? 'অ্যাপ আপডেট, অফার ও অ্যাডমিন ঘোষণা' : 'Updates, rewards & official notices'}
                 </Text>
               </View>
             </View>
-            <TouchableOpacity onPress={onClose} style={[styles.closeBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#F1F5F9' }]}>
+
+            <TouchableOpacity
+              onPress={onClose}
+              style={[styles.closeBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#F1F5F9' }]}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
               <Ionicons name="close" size={18} color={theme.textSecondary} />
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.list} showsVerticalScrollIndicator={false}>
+          <ScrollView style={styles.list} contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
             {updateInfo?.hasUpdate && (
               <View
                 style={[
                   styles.card,
                   {
-                    backgroundColor: isDark ? 'rgba(16, 185, 129, 0.12)' : '#ECFDF5',
-                    borderColor: 'rgba(16, 185, 129, 0.45)',
+                    backgroundColor: isDark ? 'rgba(16, 185, 129, 0.10)' : '#ECFDF5',
+                    borderColor: isDark ? 'rgba(16, 185, 129, 0.35)' : '#A7F3D0',
                   },
                 ]}
               >
-                <View style={styles.cardTop}>
-                  <View style={styles.cardTitleWrap}>
-                    <Ionicons name="rocket-outline" size={16} color="#10B981" />
-                    <Text style={[styles.cardTitle, { color: theme.textPrimary }]}>
-                      {isBn
-                        ? `নতুন ভার্সন উপলব্ধ (v${updateInfo.latestVersion})`
-                        : `New Version Available (v${updateInfo.latestVersion})`}
-                    </Text>
+                <View style={styles.cardRow}>
+                  <View style={[styles.cardIconBox, { backgroundColor: 'rgba(16, 185, 129, 0.18)' }]}>
+                    <Ionicons name="cloud-download-outline" size={18} color="#10B981" />
                   </View>
-                  <Text style={[styles.cardDate, { color: '#10B981', fontWeight: '700' }]}>
-                    {`v${updateInfo.currentVersion} → v${updateInfo.latestVersion}`}
-                  </Text>
+                  <View style={styles.cardBody}>
+                    <View style={styles.cardTop}>
+                      <Text style={[styles.cardTitle, { color: theme.textPrimary }]}>
+                        {isBn
+                          ? `নতুন ভার্সন উপলব্ধ (v${updateInfo.latestVersion})`
+                          : `Pockit v${updateInfo.latestVersion} Available`}
+                      </Text>
+                      <View style={[styles.tagPill, { backgroundColor: 'rgba(16, 185, 129, 0.18)' }]}>
+                        <Text style={[styles.tagText, { color: '#10B981' }]}>
+                          {`v${updateInfo.currentVersion} → v${updateInfo.latestVersion}`}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={[styles.cardMsg, { color: theme.textSecondary, marginBottom: 10 }]}>
+                      {isBn
+                        ? 'নতুন ফিচার ও বাগ ফিক্স পেতে এখনই লেটেস্ট APK ডাউনলোড করুন।'
+                        : 'A newer version of Pockit is ready on GitHub. Download the latest APK to update.'}
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => openApkDownload(updateInfo.downloadUrl)}
+                      style={styles.downloadBtn}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="arrow-down-circle-outline" size={16} color="#FFFFFF" />
+                      <Text style={styles.downloadBtnText}>
+                        {isBn ? 'আপডেট ও ডাউনলোড করুন' : 'Update & Download APK'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
-                <Text style={[styles.cardMsg, { color: theme.textSecondary, marginBottom: 10 }]}>
-                  {isBn
-                    ? 'নতুন ফিচার ও বাগ ফিক্স পেতে এখনই নতুন APK আপডেট ডাউনলোড করুন।'
-                    : 'A newer version of Pockit is ready on GitHub. Download the latest APK to update.'}
-                </Text>
-                <TouchableOpacity
-                  onPress={() => openApkDownload(updateInfo.downloadUrl)}
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 6,
-                    backgroundColor: '#10B981',
-                    paddingVertical: 9,
-                    borderRadius: 10,
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="cloud-download-outline" size={16} color="#FFFFFF" />
-                  <Text style={{ color: '#FFFFFF', fontSize: 12.5, fontWeight: '700' }}>
-                    {isBn ? 'আপডেট ও ডাউনলোড করুন' : 'Update & Download APK'}
-                  </Text>
-                </TouchableOpacity>
               </View>
             )}
+
             {loading && announcements.length === 0 && !updateInfo?.hasUpdate ? (
               <View style={styles.emptyBox}>
                 <ActivityIndicator color={theme.primary} />
               </View>
             ) : announcements.length === 0 && !updateInfo?.hasUpdate ? (
-              <View style={[styles.emptyBox, { backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : '#F8FAFC', borderColor: theme.border }]}>
-                <Ionicons name="notifications-off-outline" size={30} color={theme.textMuted} />
+              <View
+                style={[
+                  styles.emptyBox,
+                  {
+                    backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : '#F8FAFC',
+                    borderColor: theme.border,
+                  },
+                ]}
+              >
+                <View style={[styles.emptyIconWrap, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#E2E8F0' }]}>
+                  <Ionicons name="notifications-off-outline" size={26} color={theme.textMuted} />
+                </View>
                 <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>
-                  {isBn ? 'কোনো নতুন নোটিফিকেশন নেই' : 'You’re all caught up!'}
+                  {isBn ? 'কোনো নতুন নোটিফিকেশন নেই' : 'You’re all caught up'}
                 </Text>
                 <Text style={[styles.emptySub, { color: theme.textSecondary }]}>
                   {isBn
-                    ? 'নতুন কোনো অ্যাপ আপডেট বা অ্যাডমিন ঘোষণা থাকলে এখানে দেখতে পাবেন।'
-                    : 'New app updates and admin announcements will appear here.'}
+                    ? 'নতুন অ্যাপ আপডেট, অফার বা ঘোষণা থাকলে এখানে দেখতে পাবেন।'
+                    : 'App updates, streak offers, and official announcements will appear here.'}
                 </Text>
               </View>
             ) : (
               announcements.map((item) => {
                 const isUnread = unreadIds.includes(item.id);
+                const meta = getItemMeta(item);
                 return (
                   <View
                     key={item.id}
@@ -162,53 +215,50 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
                       {
                         backgroundColor: isUnread
                           ? isDark
-                            ? 'rgba(244, 123, 78, 0.10)'
-                            : '#FFF7ED'
+                            ? 'rgba(244, 123, 78, 0.09)'
+                            : '#FFFBF7'
                           : isDark
                           ? 'rgba(255,255,255,0.03)'
                           : '#F8FAFC',
-                        borderColor: isUnread ? 'rgba(244, 123, 78, 0.35)' : theme.border,
+                        borderColor: isUnread
+                          ? isDark
+                            ? 'rgba(244, 123, 78, 0.35)'
+                            : '#FED7AA'
+                          : theme.border,
                       },
                     ]}
                   >
-                    <View style={styles.cardTop}>
-                      <View style={styles.cardTitleWrap}>
-                        {isUnread && <View style={styles.unreadDot} />}
-                        <Text style={[styles.cardTitle, { color: theme.textPrimary }]} numberOfLines={2}>
-                          {item.title}
-                        </Text>
+                    <View style={styles.cardRow}>
+                      <View style={[styles.cardIconBox, { backgroundColor: meta.bg }]}>
+                        <Ionicons name={meta.icon} size={17} color={meta.color} />
                       </View>
-                      {!!item.created_at && (
-                        <Text style={[styles.cardDate, { color: theme.textMuted }]}>
-                          {formatDate(item.created_at)}
+                      <View style={styles.cardBody}>
+                        <View style={styles.cardTop}>
+                          <View style={styles.cardTitleWrap}>
+                            {isUnread && <View style={styles.unreadDot} />}
+                            <Text style={[styles.cardTitle, { color: theme.textPrimary }]} numberOfLines={2}>
+                              {item.title}
+                            </Text>
+                          </View>
+                          <View style={[styles.tagPill, { backgroundColor: meta.bg }]}>
+                            <Text style={[styles.tagText, { color: meta.color }]}>{meta.tag}</Text>
+                          </View>
+                        </View>
+                        <Text style={[styles.cardMsg, { color: theme.textSecondary }]}>
+                          {item.message}
                         </Text>
-                      )}
+                        {!!item.created_at && (
+                          <Text style={[styles.cardDate, { color: theme.textMuted }]}>
+                            {formatDate(item.created_at)}
+                          </Text>
+                        )}
+                      </View>
                     </View>
-                    <Text style={[styles.cardMsg, { color: theme.textSecondary }]}>
-                      {item.message}
-                    </Text>
                   </View>
                 );
               })
             )}
           </ScrollView>
-
-          {onOpenAppGuide && (
-            <TouchableOpacity
-              onPress={() => {
-                onClose();
-                onOpenAppGuide();
-              }}
-              style={[styles.guideFooterBtn, { borderColor: theme.border }]}
-              activeOpacity={0.75}
-            >
-              <Ionicons name="information-circle-outline" size={16} color={theme.textSecondary} />
-              <Text style={[styles.guideFooterText, { color: theme.textSecondary }]}>
-                {isBn ? 'অ্যাপ গাইড ও ফিচার পরিচিতি দেখুন' : 'View App Guide & Feature Tour'}
-              </Text>
-              <Ionicons name="chevron-forward" size={14} color={theme.textMuted} />
-            </TouchableOpacity>
-          )}
         </View>
       </View>
     </Modal>
@@ -218,22 +268,21 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.55)',
+    backgroundColor: 'rgba(0,0,0,0.58)',
     justifyContent: 'flex-end',
   },
   sheet: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
     borderWidth: 1,
     paddingHorizontal: 18,
     paddingTop: 10,
-    maxHeight: '78%',
+    maxHeight: '80%',
   },
   handle: {
-    width: 40,
+    width: 42,
     height: 4,
     borderRadius: 2,
-    backgroundColor: 'rgba(148,163,184,0.45)',
     alignSelf: 'center',
     marginBottom: 14,
   },
@@ -241,49 +290,78 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 14,
+    marginBottom: 16,
   },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 11,
+    flex: 1,
+  },
+  titleBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   iconCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 40,
+    height: 40,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
   title: {
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 17,
+    fontWeight: '800',
+    letterSpacing: -0.2,
+  },
+  newPill: {
+    backgroundColor: '#F47B4E',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 999,
+  },
+  newPillText: {
+    color: '#FFFFFF',
+    fontSize: 10.5,
+    fontWeight: '800',
   },
   subtitle: {
     fontSize: 12,
-    marginTop: 1,
+    marginTop: 2,
   },
   closeBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
   },
   list: {
-    maxHeight: 380,
+    maxHeight: 440,
+  },
+  listContent: {
+    paddingBottom: 6,
   },
   emptyBox: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 32,
-    paddingHorizontal: 20,
-    borderRadius: 16,
+    paddingVertical: 36,
+    paddingHorizontal: 22,
+    borderRadius: 18,
     borderWidth: 1,
     gap: 8,
   },
+  emptyIconWrap: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
   emptyTitle: {
-    fontSize: 15,
+    fontSize: 15.5,
     fontWeight: '700',
   },
   emptySub: {
@@ -292,10 +370,26 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   card: {
-    borderRadius: 14,
+    borderRadius: 16,
     borderWidth: 1,
-    padding: 13,
+    padding: 14,
     marginBottom: 10,
+  },
+  cardRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 11,
+  },
+  cardIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 1,
+  },
+  cardBody: {
+    flex: 1,
   },
   cardTop: {
     flexDirection: 'row',
@@ -311,35 +405,47 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   unreadDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
     backgroundColor: '#F47B4E',
   },
   cardTitle: {
     fontSize: 14,
     fontWeight: '700',
     flex: 1,
+    lineHeight: 19,
   },
-  cardDate: {
-    fontSize: 11,
+  tagPill: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  tagText: {
+    fontSize: 10.5,
+    fontWeight: '700',
   },
   cardMsg: {
     fontSize: 13,
     lineHeight: 19,
   },
-  guideFooterBtn: {
+  cardDate: {
+    fontSize: 11,
+    marginTop: 7,
+    fontWeight: '500',
+  },
+  downloadBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    paddingVertical: 11,
-    marginTop: 8,
-    borderTopWidth: 1,
+    backgroundColor: '#10B981',
+    paddingVertical: 10,
+    borderRadius: 11,
   },
-  guideFooterText: {
-    fontSize: 12.5,
-    fontWeight: '600',
+  downloadBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
   },
 });
-

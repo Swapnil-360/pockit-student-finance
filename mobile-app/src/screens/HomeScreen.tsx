@@ -904,7 +904,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         updateInfo={appUpdateInfo}
         loading={loadingAnnouncements}
         language={language}
-        onOpenAppGuide={() => setWalkthroughVisible(true)}
       />
 
       {/* Interactive Feature Walkthrough Guide Modal */}
