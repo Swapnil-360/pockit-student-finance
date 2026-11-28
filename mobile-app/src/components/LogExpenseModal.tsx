@@ -15,6 +15,7 @@ import {
 import { useTheme } from '../constants/ThemeContext';
 import { TRANSLATIONS, Language } from '../constants/translations';
 import { addExpense } from '../services/api';
+import { parseMobileBankingSms } from '../utils/smsParser';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -59,6 +60,8 @@ export const LogExpenseModal: React.FC<LogExpenseModalProps> = ({
   const [category, setCategory] = useState('Food');
   const [paymentMethod, setPaymentMethod] = useState('Cash');
   const [note, setNote] = useState('');
+  const [smsOpen, setSmsOpen] = useState(false);
+  const [smsText, setSmsText] = useState('');
   const [loading, setLoading] = useState(false);
   const insets = useSafeAreaInsets();
   const safeBottom = Math.max(insets.bottom, 16);
@@ -174,6 +177,58 @@ export const LogExpenseModal: React.FC<LogExpenseModalProps> = ({
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+            {/* Quick Paste bKash / Nagad SMS Auto-Fill */}
+            <TouchableOpacity
+              onPress={() => setSmsOpen((v) => !v)}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6,
+                paddingVertical: 8,
+                paddingHorizontal: 12,
+                borderRadius: 10,
+                borderWidth: 1,
+                borderColor: isDark ? 'rgba(244, 123, 78, 0.35)' : '#FED7AA',
+                backgroundColor: isDark ? 'rgba(244, 123, 78, 0.12)' : '#FFF7ED',
+                marginBottom: 12,
+              }}
+              activeOpacity={0.75}
+            >
+              <Ionicons name="clipboard-outline" size={14} color="#F47B4E" />
+              <Text style={{ fontSize: 12, fontWeight: '700', color: '#F47B4E' }}>
+                {language === 'bn' ? 'bKash / Nagad SMS পেস্ট করে অটো-ফিল করুন' : 'Paste bKash / Nagad SMS to Auto-Fill'}
+              </Text>
+            </TouchableOpacity>
+
+            {smsOpen && (
+              <View style={{ marginBottom: 12 }}>
+                <TextInput
+                  value={smsText}
+                  onChangeText={(txt) => {
+                    setSmsText(txt);
+                    const parsed = parseMobileBankingSms(txt);
+                    if (parsed.amount) setAmount(String(parsed.amount));
+                    if (parsed.paymentMethod) setPaymentMethod(parsed.paymentMethod);
+                    if (parsed.note) setNote(parsed.note);
+                  }}
+                  placeholder={language === 'bn' ? 'এখানে bKash বা Nagad SMS পেস্ট করুন...' : 'Paste bKash/Nagad SMS here...'}
+                  placeholderTextColor={theme.textMuted}
+                  multiline
+                  numberOfLines={2}
+                  style={{
+                    borderWidth: 1,
+                    borderColor: theme.border,
+                    borderRadius: 12,
+                    padding: 10,
+                    fontSize: 12.5,
+                    color: theme.textPrimary,
+                    backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                  }}
+                />
+              </View>
+            )}
+
             {/* 1. Unified, Borderless Hero Amount Display */}
             <View
               style={[

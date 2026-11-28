@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { saveAuthToken, clearAuthToken } from './security';
+import { enqueueOfflineAction, flushOfflineQueue } from './offlineQueue';
 
 const getInitialBaseUrl = (): string => {
   // 1. Explicit public env variable configured during EAS build or in .env
@@ -94,6 +95,10 @@ export async function readCache<T>(key: string): Promise<T | null> {
 export function writeCache(key: string, value: any): void {
   MEMORY_CACHE.set(key, value);
   AsyncStorage.setItem(key, JSON.stringify(value)).catch(() => {});
+}
+
+export async function syncPendingOfflineActions(): Promise<number> {
+  return await flushOfflineQueue(API_BASE_URL);
 }
 
 export async function checkServerSync(userId: string): Promise<boolean> {
@@ -1247,26 +1252,51 @@ export async function addIncome(payload: {
       recalibration_note_bn: updatedDash.recalibration_note_bn,
     };
   }
-  const res = await fetch(`${API_BASE_URL}/api/incomes`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  });
+  try {
+    const res = await fetchWithTimeout(`${API_BASE_URL}/api/incomes`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }, 10000);
 
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: 'Failed to add funds' }));
-    throw new Error(err.detail || 'Income creation error');
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: 'Failed to add funds' }));
+      throw new Error(err.detail || 'Income creation error');
+    }
+    const result = await res.json();
+    patchCachedDashboard(payload.user_id, (prev) => ({
+      ...prev,
+      total_income_added: Number(((prev.total_income_added || 0) + payload.amount).toFixed(1)),
+      monthly_allowance: Number(((prev.monthly_allowance || 0) + payload.amount).toFixed(1)),
+      remaining_balance: result.remaining_balance ?? Number(((prev.remaining_balance || 0) + payload.amount).toFixed(1)),
+      spendable_variable_pool: result.spendable_variable_pool ?? Number(((prev.spendable_variable_pool ?? prev.remaining_balance ?? 0) + payload.amount).toFixed(1)),
+      daily_safe_to_spend: result.daily_safe_to_spend ?? prev.daily_safe_to_spend,
+      current_risk: result.updated_risk ?? prev.current_risk,
+    }));
+    return result;
+  } catch (e: any) {
+    if (e?.name === 'AbortError' || String(e?.message || '').toLowerCase().includes('network') || String(e?.message || '').toLowerCase().includes('fetch')) {
+      await enqueueOfflineAction('add_income', payload);
+      const localInc: IncomeItem = {
+        id: 'offline_inc_' + Date.now(),
+        user_id: payload.user_id,
+        amount: payload.amount,
+        source: payload.source,
+        payment_method: payload.payment_method,
+        note: payload.note,
+        date: payload.date || new Date().toISOString().substring(0, 10),
+      };
+      await patchCachedDashboard(payload.user_id, (prev) => ({
+        ...prev,
+        total_income_added: Number(((prev.total_income_added || 0) + payload.amount).toFixed(1)),
+        monthly_allowance: Number(((prev.monthly_allowance || 0) + payload.amount).toFixed(1)),
+        remaining_balance: Number(((prev.remaining_balance || 0) + payload.amount).toFixed(1)),
+        spendable_variable_pool: Number(((prev.spendable_variable_pool ?? prev.remaining_balance ?? 0) + payload.amount).toFixed(1)),
+      }));
+      return { status: 'queued_offline', income: localInc };
+    }
+    throw e;
   }
-  const result = await res.json();
-  patchCachedDashboard(payload.user_id, (prev) => ({
-    ...prev,
-    total_income_added: Number(((prev.total_income_added || 0) + payload.amount).toFixed(1)),
-    monthly_allowance: Number(((prev.monthly_allowance || 0) + payload.amount).toFixed(1)),
-    remaining_balance: result.remaining_balance ?? Number(((prev.remaining_balance || 0) + payload.amount).toFixed(1)),
-    daily_safe_to_spend: result.daily_safe_to_spend ?? prev.daily_safe_to_spend,
-    current_risk: result.updated_risk ?? prev.current_risk,
-  }));
-  return result;
 }
 
 export async function fetchIncomes(userId: string, month?: string): Promise<IncomeItem[]> {
@@ -1350,27 +1380,52 @@ export async function addExpense(payload: {
       recalibration_note_bn: updatedDash.recalibration_note_bn,
     };
   }
-  const res = await fetch(`${API_BASE_URL}/api/expenses`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  });
+  try {
+    const res = await fetchWithTimeout(`${API_BASE_URL}/api/expenses`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }, 10000);
 
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: 'Failed to record expense' }));
-    throw new Error(err.detail || 'Expense creation error');
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: 'Failed to record expense' }));
+      throw new Error(err.detail || 'Expense creation error');
+    }
+
+    const result = await res.json();
+    patchCachedDashboard(payload.user_id, (prev) => ({
+      ...prev,
+      total_spent: Number(((prev.total_spent || 0) + payload.amount).toFixed(1)),
+      remaining_balance: result.remaining_balance ?? Number(((prev.remaining_balance || 0) - payload.amount).toFixed(1)),
+      spendable_variable_pool: result.spendable_variable_pool ?? Number(((prev.spendable_variable_pool ?? prev.remaining_balance ?? 0) - payload.amount).toFixed(1)),
+      daily_safe_to_spend: result.daily_safe_to_spend ?? prev.daily_safe_to_spend,
+      current_risk: result.updated_risk ?? prev.current_risk,
+      recent_expenses: result.expense ? [result.expense, ...(prev.recent_expenses || [])].slice(0, 8) : prev.recent_expenses,
+    }));
+    return result;
+  } catch (e: any) {
+    if (e?.name === 'AbortError' || String(e?.message || '').toLowerCase().includes('network') || String(e?.message || '').toLowerCase().includes('fetch')) {
+      await enqueueOfflineAction('add_expense', payload);
+      const localExp: ExpenseItem = {
+        id: 'offline_exp_' + Date.now(),
+        user_id: payload.user_id,
+        amount: payload.amount,
+        category: payload.category,
+        payment_method: payload.payment_method,
+        note: payload.note,
+        date: payload.date || new Date().toISOString().substring(0, 10),
+      };
+      await patchCachedDashboard(payload.user_id, (prev) => ({
+        ...prev,
+        total_spent: Number(((prev.total_spent || 0) + payload.amount).toFixed(1)),
+        remaining_balance: Number(((prev.remaining_balance || 0) - payload.amount).toFixed(1)),
+        spendable_variable_pool: Number(((prev.spendable_variable_pool ?? prev.remaining_balance ?? 0) - payload.amount).toFixed(1)),
+        recent_expenses: [localExp, ...(prev.recent_expenses || [])].slice(0, 8),
+      }));
+      return { status: 'queued_offline', expense: localExp };
+    }
+    throw e;
   }
-
-  const result = await res.json();
-  patchCachedDashboard(payload.user_id, (prev) => ({
-    ...prev,
-    total_spent: Number(((prev.total_spent || 0) + payload.amount).toFixed(1)),
-    remaining_balance: result.remaining_balance ?? Number(((prev.remaining_balance || 0) - payload.amount).toFixed(1)),
-    daily_safe_to_spend: result.daily_safe_to_spend ?? prev.daily_safe_to_spend,
-    current_risk: result.updated_risk ?? prev.current_risk,
-    recent_expenses: result.expense ? [result.expense, ...(prev.recent_expenses || [])].slice(0, 8) : prev.recent_expenses,
-  }));
-  return result;
 }
 
 export async function fetchExpenses(
@@ -1394,6 +1449,21 @@ export async function fetchExpenses(
     if (res.ok) return await res.json();
   } catch (e) {}
   return [];
+}
+
+export async function updateExpense(
+  expenseId: string,
+  payload: { user_id: string; amount?: number; category?: string; payment_method?: string; note?: string }
+): Promise<any> {
+  const res = await fetchWithTimeout(`${API_BASE_URL}/api/expenses/${expenseId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  }, 10000);
+  if (!res.ok) throw new Error('Failed to update expense');
+  const data = await res.json();
+  await fetchDashboard(payload.user_id).catch(() => null);
+  return data;
 }
 
 export async function deleteExpense(expenseId: string, userId: string): Promise<any> {

@@ -58,7 +58,7 @@
       ]
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/brand/logo.png"
     },
     "plugins": [
       "expo-asset",

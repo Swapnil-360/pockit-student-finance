@@ -1,0 +1,53 @@
+name: Pockit CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install backend dependencies
+        working-directory: backend
+        run: pip install -r requirements.txt
+      - name: Run admin & API test suite
+        working-directory: backend
+        env:
+          ADMIN_EMAIL: admin@pockit.app
+          ADMIN_PASSWORD: ci-test-admin-password
+        run: python test_admin.py
+
+  mobile-typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install mobile dependencies
+        working-directory: mobile-app
+        run: npm ci
+      - name: TypeScript check
+        working-directory: mobile-app
+        run: npx tsc --noEmit
+
+  admin-panel-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install admin-panel dependencies
+        working-directory: admin-panel
+        run: npm ci
+      - name: Build admin panel
+        working-directory: admin-panel
+        run: npm run build

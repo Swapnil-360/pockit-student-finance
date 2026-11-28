@@ -81,8 +81,8 @@ class HybridPipelineService:
                 )
                 return summary, metrics
 
-        # 1. Fetch live monthly aggregates
-        now = datetime.now()
+        # 1. Fetch live monthly aggregates (using Bangladesh Dhaka time)
+        now = db._dhaka_now()
         month_str = now.strftime("%Y-%m")
         aggregates = db.get_monthly_aggregates(user_id, month_str)
 

@@ -36,6 +36,7 @@ import { FeatureWalkthroughModal } from './src/components/FeatureWalkthroughModa
 import {
   fetchDashboard,
   checkServerSync,
+  syncPendingOfflineActions,
   subscribeDashboardCache,
   getStudentProfile,
   authGoogle,
@@ -282,10 +283,11 @@ function AppContent() {
           setSplashActive(false);
         }
 
-        // 2. Check lightweight sync version first; only download full payload if changed (or no cache)
+        // 2. Flush any queued offline writes, then check lightweight sync version
         const refreshTask = (async () => {
           try {
-            const shouldSync = !cachedDashStr || !cachedProfile || (await checkServerSync(result.user!.id));
+            const syncedCount = await syncPendingOfflineActions().catch(() => 0);
+            const shouldSync = syncedCount > 0 || !cachedDashStr || !cachedProfile || (await checkServerSync(result.user!.id));
             if (!shouldSync) return;
 
             const [profile, dash] = await Promise.all([
@@ -357,6 +359,7 @@ function AppContent() {
     setRefreshing(true);
     setRefreshTrigger((prev) => prev + 1);
     try {
+      await syncPendingOfflineActions().catch(() => 0);
       const dash = await fetchDashboard(user.id);
       setDashboard(dash);
     } finally {

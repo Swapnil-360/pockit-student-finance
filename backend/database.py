@@ -1407,6 +1407,56 @@ class Database:
             "date": date_str
         }
 
+    def update_expense(
+        self,
+        expense_id: str,
+        user_id: str,
+        amount: Optional[float] = None,
+        category: Optional[str] = None,
+        payment_method: Optional[str] = None,
+        note: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        fields: List[str] = []
+        params: List[Any] = []
+        sb_updates: Dict[str, Any] = {}
+        if amount is not None:
+            fields.append("amount = ?")
+            params.append(float(amount))
+            sb_updates["amount"] = float(amount)
+        if category is not None:
+            fields.append("category = ?")
+            params.append(category)
+            sb_updates["category"] = category
+        if payment_method is not None:
+            fields.append("payment_method = ?")
+            params.append(payment_method)
+            sb_updates["payment_method"] = payment_method
+        if note is not None:
+            fields.append("note = ?")
+            params.append(note)
+            sb_updates["note"] = note
+        if not fields:
+            return None
+
+        params.extend([expense_id, user_id])
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"UPDATE expenses SET {', '.join(fields)} WHERE id = ? AND user_id = ?",
+                tuple(params),
+            )
+            conn.commit()
+            cursor.execute("SELECT * FROM expenses WHERE id = ? AND user_id = ?", (expense_id, user_id))
+            row = cursor.fetchone()
+
+        if self.supabase and sb_updates:
+            try:
+                self.supabase.table('expenses').update(sb_updates).eq('id', self._to_uuid(expense_id)).execute()
+            except Exception as e:
+                print(f"[Supabase sync notice] update_expense: {e}")
+
+        return dict(row) if row else None
+
     def delete_expense(self, expense_id: str, user_id: str) -> bool:
         with self._get_connection() as conn:
             cursor = conn.cursor()

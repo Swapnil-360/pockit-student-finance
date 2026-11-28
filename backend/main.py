@@ -712,6 +712,7 @@ def add_monthly_income(req: IncomeCreateRequest):
             "updated_risk": summary,
             "daily_safe_to_spend": metrics["daily_safe_to_spend"],
             "remaining_balance": metrics["remaining_balance"],
+            "spendable_variable_pool": metrics["spendable_variable_pool"],
             "total_monthly_money": metrics["monthly_allowance"]
         }
     except Exception as e:
@@ -767,7 +768,10 @@ def add_daily_expense(req: ExpenseCreateRequest):
             "expense": new_exp,
             "updated_risk": summary,
             "daily_safe_to_spend": metrics["daily_safe_to_spend"],
-            "remaining_balance": metrics["remaining_balance"]
+            "remaining_balance": metrics["remaining_balance"],
+            "spendable_variable_pool": metrics["spendable_variable_pool"],
+            "recalibration_note_en": metrics.get("recalibration_note_en"),
+            "recalibration_note_bn": metrics.get("recalibration_note_bn"),
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to add expense: {str(e)}")
@@ -782,6 +786,32 @@ def list_expenses(
 ):
     expenses = db.get_expenses(user_id=user_id, month=month, category=category, limit=limit)
     return [ExpenseItem(**e) for e in expenses]
+
+
+@app.put("/api/expenses/{expense_id}")
+def update_daily_expense(expense_id: str, req: Dict[str, Any]):
+    user_id = str(req.get("user_id") or "").strip()
+    if not user_id:
+        raise HTTPException(status_code=400, detail="user_id is required")
+    updated = db.update_expense(
+        expense_id=expense_id,
+        user_id=user_id,
+        amount=float(req["amount"]) if req.get("amount") is not None else None,
+        category=req.get("category"),
+        payment_method=req.get("payment_method"),
+        note=req.get("note"),
+    )
+    if not updated:
+        raise HTTPException(status_code=404, detail="Expense entry not found or unauthorized.")
+    summary, metrics = pipeline_service.evaluate_live_student_risk(user_id, trigger_event="expense_updated")
+    return {
+        "status": "success",
+        "expense": updated,
+        "updated_risk": summary,
+        "daily_safe_to_spend": metrics["daily_safe_to_spend"],
+        "remaining_balance": metrics["remaining_balance"],
+        "spendable_variable_pool": metrics["spendable_variable_pool"],
+    }
 
 
 @app.delete("/api/expenses/{expense_id}")
