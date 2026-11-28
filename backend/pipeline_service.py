@@ -531,8 +531,8 @@ class HybridPipelineService:
         }
 
 
-        # Record snapshot in history if not a temporary simulation
-        if not simulated_expense:
+        # Record snapshot in history only on actual mutations (not read-only dashboard views)
+        if not simulated_expense and trigger_event != "dashboard_view":
             db.record_risk_snapshot(
                 user_id=user_id,
                 risk_score_pct=risk_pct,

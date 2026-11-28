@@ -62,6 +62,21 @@ class Database:
 
         self._init_tables()
         self._ensure_demo_user()
+        self._user_versions: Dict[str, str] = {}
+        self._global_mutation_seq: int = int(time.time() * 1000)
+
+    def get_user_data_version(self, user_id: str) -> str:
+        """Returns a lightweight version token combining per-user and global mutations."""
+        uv = self._user_versions.get(user_id, str(self._global_mutation_seq))
+        return f"{uv}-{self._global_mutation_seq}"
+
+    def bump_user_data_version(self, user_id: Optional[str] = None) -> str:
+        """Bumps the version token whenever any user or admin mutation occurs."""
+        now_ms = int(time.time() * 1000)
+        self._global_mutation_seq = max(self._global_mutation_seq + 1, now_ms)
+        if user_id:
+            self._user_versions[user_id] = str(now_ms)
+        return str(self._global_mutation_seq)
 
     def _to_uuid(self, uid: str) -> str:
         """Converts any local ID (or demo string) to a valid deterministic UUID for Supabase PostgreSQL."""

@@ -20,6 +20,7 @@ import { TRANSLATIONS, Language } from '../constants/translations';
 import { GlassCard } from '../components/GlassCard';
 import {
   fetchCalendarLedger,
+  getCachedCalendarLedger,
   deleteExpense,
   deleteIncome,
   fetchPeerDebts,
@@ -142,12 +143,18 @@ export const CalendarLedgerScreen: React.FC<CalendarLedgerScreenProps> = ({
     : `${monthNamesEn[currentMonthIdx]} ${currentYear}`;
 
   const loadLedger = async () => {
-    setLoading(true);
+    const cached = await getCachedCalendarLedger(userId, monthString);
+    if (cached) {
+      setLedgerData(cached);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
     try {
       const data = await fetchCalendarLedger(userId, monthString);
       setLedgerData(data);
     } catch (e) {
-      // Offline fallback
+      // Offline fallback already loaded from cache
     } finally {
       setLoading(false);
     }

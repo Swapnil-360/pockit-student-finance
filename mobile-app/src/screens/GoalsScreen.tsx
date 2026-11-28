@@ -14,7 +14,14 @@ import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../constants/ThemeContext';
 import { TRANSLATIONS, Language } from '../constants/translations';
-import { fetchSavingsGoals, toggleGoalPause, boostSavingsGoal, deleteSavingsGoal, SavingsGoal } from '../services/api';
+import {
+  fetchSavingsGoals,
+  getCachedGoals,
+  toggleGoalPause,
+  boostSavingsGoal,
+  deleteSavingsGoal,
+  SavingsGoal,
+} from '../services/api';
 import { SavingsGoalCard } from '../components/SavingsGoalCard';
 import { CreateGoalModal } from '../components/CreateGoalModal';
 import { BoostGoalModal } from '../components/BoostGoalModal';
@@ -50,6 +57,12 @@ export const GoalsScreen: React.FC<GoalsScreenProps> = ({
 
   const loadGoals = useCallback(async () => {
     try {
+      const cached = await getCachedGoals(userId);
+      if (cached && cached.length > 0) {
+        setGoals(cached);
+        if (!selectedGoal) setSelectedGoal(cached[0]);
+        setLoading(false);
+      }
       const data = await fetchSavingsGoals(userId);
       setGoals(data);
       if (data.length > 0 && !selectedGoal) {

@@ -58,6 +58,91 @@ export const setApiBaseUrl = (url: string) => {
   API_BASE_URL = url;
 };
 
+// --- IN-MEMORY + ASYNCSTORAGE CACHE ENGINE ---
+const MEMORY_CACHE = new Map<string, any>();
+type DashboardListener = (userId: string, data: DashboardData) => void;
+const DASHBOARD_LISTENERS = new Set<DashboardListener>();
+
+export function subscribeDashboardCache(listener: DashboardListener): () => void {
+  DASHBOARD_LISTENERS.add(listener);
+  return () => DASHBOARD_LISTENERS.delete(listener);
+}
+
+function notifyDashboardListeners(userId: string, data: DashboardData) {
+  DASHBOARD_LISTENERS.forEach((fn) => {
+    try {
+      fn(userId, data);
+    } catch {}
+  });
+}
+
+export async function readCache<T>(key: string): Promise<T | null> {
+  if (MEMORY_CACHE.has(key)) {
+    return MEMORY_CACHE.get(key) as T;
+  }
+  try {
+    const raw = await AsyncStorage.getItem(key);
+    if (raw) {
+      const parsed = JSON.parse(raw) as T;
+      MEMORY_CACHE.set(key, parsed);
+      return parsed;
+    }
+  } catch {}
+  return null;
+}
+
+export function writeCache(key: string, value: any): void {
+  MEMORY_CACHE.set(key, value);
+  AsyncStorage.setItem(key, JSON.stringify(value)).catch(() => {});
+}
+
+export async function checkServerSync(userId: string): Promise<boolean> {
+  if (userId === GUEST_USER_ID) return false;
+  const vKey = `@pockit_sync_v_${userId}`;
+  try {
+    const lastV = (await readCache<string>(vKey)) || '';
+    const res = await fetchWithTimeout(
+      `${API_BASE_URL}/api/sync-check/${userId}?v=${encodeURIComponent(lastV)}`,
+      {},
+      4500
+    );
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.v) writeCache(vKey, String(data.v));
+      return Boolean(data?.changed);
+    }
+  } catch {}
+  return false;
+}
+
+export async function getCachedDashboard(userId: string): Promise<DashboardData | null> {
+  return (
+    (await readCache<DashboardData>(`@pockit_dash_${userId}`)) ||
+    (await readCache<DashboardData>(STORAGE_KEYS.DASHBOARD_CACHE))
+  );
+}
+
+export async function getCachedGoals(userId: string): Promise<SavingsGoal[] | null> {
+  if (userId === GUEST_USER_ID) {
+    return await readCache<SavingsGoal[]>(GUEST_STORAGE_KEYS.GOALS);
+  }
+  return await readCache<SavingsGoal[]>(`@pockit_goals_${userId}`);
+}
+
+export async function getCachedCalendarLedger(userId: string, month?: string): Promise<CalendarLedgerResponse | null> {
+  const monthStr = month || new Date().toISOString().substring(0, 7);
+  return await readCache<CalendarLedgerResponse>(`@pockit_ledger_${userId}_${monthStr}`);
+}
+
+async function patchCachedDashboard(userId: string, updater: (prev: DashboardData) => DashboardData): Promise<void> {
+  const prev = await getCachedDashboard(userId);
+  if (!prev) return;
+  const next = updater(prev);
+  writeCache(`@pockit_dash_${userId}`, next);
+  writeCache(STORAGE_KEYS.DASHBOARD_CACHE, next);
+  notifyDashboardListeners(userId, next);
+}
+
 export async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 8000): Promise<Response> {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeoutMs);
@@ -1115,14 +1200,17 @@ export async function fetchDashboard(userId: string): Promise<DashboardData> {
     const res = await fetchWithTimeout(`${API_BASE_URL}/api/dashboard/${userId}`, {}, 25000);
     if (res.ok) {
       const data: DashboardData = await res.json();
-      await AsyncStorage.setItem(STORAGE_KEYS.DASHBOARD_CACHE, JSON.stringify(data));
+      writeCache(`@pockit_dash_${userId}`, data);
+      writeCache(STORAGE_KEYS.DASHBOARD_CACHE, data);
+      notifyDashboardListeners(userId, data);
       return data;
     }
   } catch (e) {
-    const cached = await AsyncStorage.getItem(STORAGE_KEYS.DASHBOARD_CACHE);
-    if (cached) return JSON.parse(cached);
+    const cached = await getCachedDashboard(userId);
+    if (cached) return cached;
   }
-  return createEmptyDashboard(userId);
+  const fallback = await getCachedDashboard(userId);
+  return fallback || createEmptyDashboard(userId);
 }
 
 // --- INCOMES (Multi-source fund additions) ---
@@ -1169,7 +1257,16 @@ export async function addIncome(payload: {
     const err = await res.json().catch(() => ({ detail: 'Failed to add funds' }));
     throw new Error(err.detail || 'Income creation error');
   }
-  return await res.json();
+  const result = await res.json();
+  patchCachedDashboard(payload.user_id, (prev) => ({
+    ...prev,
+    total_income_added: Number(((prev.total_income_added || 0) + payload.amount).toFixed(1)),
+    monthly_allowance: Number(((prev.monthly_allowance || 0) + payload.amount).toFixed(1)),
+    remaining_balance: result.remaining_balance ?? Number(((prev.remaining_balance || 0) + payload.amount).toFixed(1)),
+    daily_safe_to_spend: result.daily_safe_to_spend ?? prev.daily_safe_to_spend,
+    current_risk: result.updated_risk ?? prev.current_risk,
+  }));
+  return result;
 }
 
 export async function fetchIncomes(userId: string, month?: string): Promise<IncomeItem[]> {
@@ -1264,7 +1361,16 @@ export async function addExpense(payload: {
     throw new Error(err.detail || 'Expense creation error');
   }
 
-  return await res.json();
+  const result = await res.json();
+  patchCachedDashboard(payload.user_id, (prev) => ({
+    ...prev,
+    total_spent: Number(((prev.total_spent || 0) + payload.amount).toFixed(1)),
+    remaining_balance: result.remaining_balance ?? Number(((prev.remaining_balance || 0) - payload.amount).toFixed(1)),
+    daily_safe_to_spend: result.daily_safe_to_spend ?? prev.daily_safe_to_spend,
+    current_risk: result.updated_risk ?? prev.current_risk,
+    recent_expenses: result.expense ? [result.expense, ...(prev.recent_expenses || [])].slice(0, 8) : prev.recent_expenses,
+  }));
+  return result;
 }
 
 export async function fetchExpenses(
@@ -1347,10 +1453,17 @@ export async function fetchCalendarLedger(userId: string, month?: string): Promi
       transactions: transactions.sort((a, b) => b.date.localeCompare(a.date)),
     };
   }
+  const cacheKey = `@pockit_ledger_${userId}_${monthStr}`;
   try {
-    const res = await fetch(`${API_BASE_URL}/api/ledger/${userId}?month=${encodeURIComponent(monthStr)}`);
-    if (res.ok) return await res.json();
+    const res = await fetchWithTimeout(`${API_BASE_URL}/api/ledger/${userId}?month=${encodeURIComponent(monthStr)}`, {}, 15000);
+    if (res.ok) {
+      const data: CalendarLedgerResponse = await res.json();
+      writeCache(cacheKey, data);
+      return data;
+    }
   } catch (e) {}
+  const cached = await readCache<CalendarLedgerResponse>(cacheKey);
+  if (cached) return cached;
   return {
     month: monthStr,
     total_income: 0,
@@ -1742,7 +1855,18 @@ export async function boostSavingsGoal(goalId: string, userId: string, amount: n
     const err = await res.json().catch(() => ({ detail: 'Failed to boost goal' }));
     throw new Error(err.detail || 'Failed to boost goal');
   }
-  return await res.json();
+  const updated: SavingsGoal = await res.json();
+  const cacheKey = `@pockit_goals_${userId}`;
+  const existing = (await readCache<SavingsGoal[]>(cacheKey)) || [];
+  const nextGoals = existing.some((g) => g.id === updated.id)
+    ? existing.map((g) => (g.id === updated.id ? updated : g))
+    : [updated, ...existing];
+  writeCache(cacheKey, nextGoals);
+  patchCachedDashboard(userId, (prev) => ({
+    ...prev,
+    active_goal: prev.active_goal?.id === updated.id || updated.is_active ? updated : prev.active_goal,
+  }));
+  return updated;
 }
 
 export async function toggleGoalPause(goalId: string, userId: string): Promise<SavingsGoal> {

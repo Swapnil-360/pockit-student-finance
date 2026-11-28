@@ -35,6 +35,8 @@ import { AmbientGlowBackground } from './src/components/AmbientGlowBackground';
 import { FeatureWalkthroughModal } from './src/components/FeatureWalkthroughModal';
 import {
   fetchDashboard,
+  checkServerSync,
+  subscribeDashboardCache,
   getStudentProfile,
   authGoogle,
   UserData,
@@ -237,6 +239,14 @@ function AppContent() {
     }
   }, [user?.id, language]);
 
+  useEffect(() => {
+    return subscribeDashboardCache((uid, nextDash) => {
+      if (user?.id === uid) {
+        setDashboard(nextDash);
+      }
+    });
+  }, [user?.id]);
+
   const handleSplashFinish = async (result: {
     user: UserData | null;
     hasPin: boolean;
@@ -272,9 +282,12 @@ function AppContent() {
           setSplashActive(false);
         }
 
-        // 2. Refresh profile and dashboard in parallel (non-blocking if cached)
+        // 2. Check lightweight sync version first; only download full payload if changed (or no cache)
         const refreshTask = (async () => {
           try {
+            const shouldSync = !cachedDashStr || !cachedProfile || (await checkServerSync(result.user!.id));
+            if (!shouldSync) return;
+
             const [profile, dash] = await Promise.all([
               getStudentProfile(result.user!.id).catch(() => null),
               fetchDashboard(result.user!.id).catch(() => null),
@@ -374,8 +387,13 @@ function AppContent() {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       } catch {}
       setActiveTab(tab);
-      if (tab === 'home') {
-        refreshData();
+      if (tab === 'home' && user) {
+        // Silent delta sync: only re-fetch dashboard if server data actually changed
+        checkServerSync(user.id).then((changed) => {
+          if (changed) {
+            fetchDashboard(user.id).then((d) => setDashboard(d)).catch(() => {});
+          }
+        });
       }
     } else if (tab === 'home') {
       // Tap on active Home tab also triggers instant refresh

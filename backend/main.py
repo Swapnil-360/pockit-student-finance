@@ -120,6 +120,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+@app.middleware("http")
+async def sync_version_middleware(request, call_next):
+    response = await call_next(request)
+    if request.method in ("POST", "PUT", "DELETE", "PATCH") and response.status_code < 400:
+        if request.url.path.startswith("/api/"):
+            db.bump_user_data_version()
+    return response
+
 app.include_router(admin_router)
 
 
@@ -806,6 +815,13 @@ def get_monthly_calendar_ledger(
 
 
 # --- 6. DASHBOARD ENDPOINT ---
+@app.get("/api/sync-check/{user_id}")
+def check_user_sync_version(user_id: str, v: Optional[str] = Query(None)):
+    """Ultra-lightweight endpoint so clients only re-download dashboard/goals/ledger when data changed."""
+    current_v = db.get_user_data_version(user_id)
+    return {"changed": v != current_v, "v": current_v}
+
+
 @app.get("/api/dashboard/{user_id}", response_model=DashboardResponse)
 def get_user_dashboard(user_id: str):
     try:
